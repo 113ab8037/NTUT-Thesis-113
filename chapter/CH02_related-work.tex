@@ -1,0 +1,164 @@
+\begin{ZhChapter}
+
+\chapter{文獻探討}
+
+\section{系統測試的發展歷史}
+
+\text 在傳統軟體開發生命週期中，系統測試（System Testing）負責驗證完全整合後的產品是否符合規格要求，是品質保證（Quality Assurance, QA）對照初期需求進行全面驗收的重要階段。然而，隨著對開發速度與彈性的需求不斷提升，特別是在敏捷（Agile）方法興起後，耗時且成本高昂的測試流程（例如大規模回歸測試）逐漸被視為難以持續。組織投入於品質保證與測試的資源已占據 IT 預算的相當比例，使得過去將測試視為獨立階段的做法難以因應當前需求。
+因此，系統測試逐漸從傳統的後置活動，轉變為嵌入短週期開發衝刺（Sprint）中的持續性驗證與確認（Continuous V&V）流程。這一轉變促使「自動化測試」（Automated Testing）在軟體開發中迅速普及，QA 團隊開始撰寫可重複執行的測試腳本，以確保功能在頻繁修改下仍保持正確性。
+隨著 CI/CD 的導入，快速部署與「持續測試」（Continuous Testing）成為現代 DevOps 實踐的核心，用以縮短從程式碼提交到上線的整體時間。自動化的系統測試與整合測試被內嵌於 CI/CD 管線（Pipeline）中，使其成為穩定交付品質的必要條件。\cite{TestingSoftwareSystems}
+\begin{itemize}
+    \item 持續整合（CI）：開發人員頻繁將程式碼合併至中央倉儲，每次合併都會自動觸發建構（Build）與自動化測試（通常涵蓋單元測試與整合測試）。
+    \item 持續部署（CD）：作為 CI 的延伸，當程式碼通過所有自動化測試後，可自動部署至預備環境(Staging)或生產環境(Production)。
+\end{itemize}
+\text 自動化測試成為 CI/CD Pipeline的「品質守門員」（Quality Gatekeeper），讓團隊能夠更有信心地維持高頻率的版本發布。
+系統測試通常採用「黑箱測試」（Black-box Testing）方法，不要求測試者理解內部程式邏輯，而是透過檢驗輸入與預期輸出之間的一致性來驗證系統行為。\cite{Nguyen2024KAT}\cite{OracleProblemSurvey}於現代 RESTful API 的情境中，多數方法從 API 規範（OpenAPI Specification, OAS）推導測試案例。整體而言，系統測試主要涵蓋兩大類別：
+\begin{enumerate}
+    \item 功能測試（Functional Testing）：檢驗系統是否如需求所述運作，確保功能性（Functional suitability）符合明示或隱含的需求。\cite{TestingSoftwareSystems}
+    \item 非功能測試（Non-Functional Testing, NFT）：評估系統執行功能的品質，包括效能效率（Performance efficiency）、安全性（Security）、可用性（Usability）、可維護性（Maintainability）等面向。
+\end{enumerate}
+儘管自動化測試在 CI/CD 中涵蓋了單元測試、整合測試及部分非功能測試，但仍存在結構性限制。黑箱測試中特別突出的問題是測試腳本（Test Oracle）不足，使得全面自動化難以達成。\cite{Anonymous2025GenAIRoles}
+傳統自動化測試多依賴 API 回應（例如 HTTP 狀態碼）或 API 規範（如 OAS）的不一致性偵測\cite{Alonso2023ARTE}，但這不足以確保端到端（End-to-end）的回傳正確性。\cite{OracleProblemSurvey}
+在複雜的 RESTful API 系統中，傳統方法難以處理操作間的複雜依賴性（Inter-operation Dependencies）和參數間依賴性（Inter-parameter Dependencies, IPDs）\cite{Nguyen2024KAT}\cite{Kim2025LlamaRestTest}，尤其是在通用系統（Ubiquitous Systems）的開發境下，這些挑戰使得測試階段仍需投入大量研究與人力。\cite{SanchezGuinea2016Systematic}
+
+\section{自動化系統測試與CI/CD的挑戰}
+隨著軟體即服務（Software-as-a-Service, SaaS）成為主流，RESTful API 已成為現代軟體架構的核心，而其品質驗證的重要性愈發凸顯。特別是在安全性關鍵系統（safety-critical systems）中，驗收測試（Acceptance Testing，即系統測試）仍是確保軟體符合功能需求的最終關卡。然而，當開發流程加速朝向敏捷（Agile）與 CI/CD 的短迭代模式前進時，自動化測試面臨的挑戰也變得更加突出。這些挑戰從腳本生成一路延伸到實際執行，暴露出現行品質保證機制與開發節奏之間根本性的落差。\cite{Wang2020AutomaticGeneration}
+業界長期面臨的一大瓶頸，是測試腳本難以完全自動化，尤其在缺乏形式化規格或斷言（assertion）的情況下，很難以自動化方式判定系統輸出是否屬於「可接受的正確行為」。\cite{OracleProblemSurvey}對於複雜功能的 End-to-End 回傳正確性，CI/CD 仍不得不依賴測試人員進行手動檢查，形成實質的人力成本負擔。\cite{Wang2020AutomaticGeneration}
+\subsection{腳本撰寫階段的挑戰}
+在腳本撰寫階段，主要困難來自如何從非結構化需求中生成可執行的測試案例：
+\begin{enumerate}
+    \item 傳統自動化方法往往假設系統需求以 UML 行為模型（如活動圖、序列圖）呈現。然而在真實的工業環境中，要建立足夠精確的行為模型，其規格化成本極高，通常不被工程團隊視為可行選項。\cite{Wang2020AutomaticGeneration}
+    \item 大多數需求規格以自然語言（Natural Language, NL）撰寫使用案例規範（use case specifications）。要從這些文件中手動萃取執行場景與輸入資料，不僅昂貴且易出錯。即便使用 NLP 自動生成測試模型，也常需要大量人工修補以補足可執行的輸入資料，導致擴展性（scalability）不足。\cite{Wang2020AutomaticGeneration}
+\end{enumerate}
+\subsection{自動化測試執行階段的挑戰}
+即使測試腳本撰寫完成，在執行階段仍會因現代 RESTful API 的複雜性遭遇多重困難：
+\begin{enumerate}
+    \item 同時確保輸入資料具有語法正確性（syntactic validity）與語義一致性（semantic coherence）是具挑戰性的問題之一。如 RESTLess指出許多模糊測試工具依賴字典或隨機渲染參數值，使輸入缺乏語義真實性，導致大量請求在進入系統前便被阻擋。這些無效請求不但造成執行效率低落，也浪費大量資源。\cite{Zheng2024RESTLess}
+    \item 傳統的自動化測試方法，難以有效處理 RESTful API 跨操作（inter-operation）跨參數（inter-parameter）啟發式方法（heuristic approaches）。欄位名稱稍有不一致，就可能誤判或忽略依賴。若改以人工補充依賴（如 RESTest 的方式），則會造成測試工程師沉重的維護負擔。\cite{Nguyen2024KAT}
+    \item 因無法精確處理複雜依賴關係，多數工具傾向生成短序列、且缺乏參數權重考量，限制了序列類型和長度的多樣性。導致難以觸發隱藏在複雜操作組合下的深層次錯誤（hard-to-reach states），導致測試成效大打折扣。\cite{Zheng2024RESTLess}
+\end{enumerate}
+
+\section{RESTful API 自動化測試技術的現況}
+新興的大型語言模型（LLMs）程式碼生成和測試案例生成方面展現出顯著的能力。\cite{Wang2020AutomaticGeneration}於軟體測試領域中，LLM 已被廣泛應用於自動生成測試腳本、約束驗證腳本、測試案例和測試資料，並具備理解與辨識複雜依賴關係的能力。\cite{Nguyen2024KAT}此外，此外，LLM 也能生成高度語義相關與具真實性的測試輸入值，這對提升RESTful API自動化測試的覆蓋率和減少因隨機輸入造成的無效請求具有關鍵作用。\cite{Kim2025LlamaRestTest}
+透過利用LLM的計算和推理能力，結合外部工具（例如 Python 直譯器，正如 TestChain 框架所示），測試輸出映射複雜的問題可以被拆解並分步推理，從而大幅提高測試案例的準確性，並降低傳統測試腳本帶來的維護負擔。\cite{Wang2020AutomaticGeneration}LLM驅動的測試技術發展意味著 QA/測試工程師的角色將迎來重大轉變，並為自動化系統測試的下一階段演進奠定基礎。\cite{Anonymous2025GenAIRoles}
+
+\subsection{LLM結合RESTful API自動化測試三大核心}
+LLM驅動的自動化測試技術，主要在下列三個核心層面解決了RESTful API執行測試的挑戰，並提供更全面的功能面End-to-End驗證能力\cite{Nguyen2024KAT}：
+\subsubsection*{（一）依賴性解析與操作序列的精確推導}
+LLM 的自然語言理解能力，能處理傳統啟發式方法難以捕捉的複雜依賴性。像KAT的AI驅動方法利用GPT模型解析OAS文件中的自然語言描述，系統性地提取和辨識操作間依賴性（Inter-operation Dependencies, ODG）與參數間依賴性（Inter-parameter Dependencies, IPD）。LLM能夠構建操作依賴圖（ODG），明確標示操作之間的順序與依賴關係，並能直接無縫整合到測試腳本生成階段，確保測試序列符合業務邏輯並達成End-to-End的正確性驗證。\cite{Nguyen2024KAT}
+\subsubsection*{（二）生成具語義真實性的測試輸入}
+傳統測試面臨的主要挑戰，是缺乏具備真實意義（realistic）和語義有效（semantically valid）的測試輸入。\cite{Alonso2023ARTE}LLM 能生成高度語義相關與具真實性的參數值，\cite{Anonymous2023LLMGenerators}有效改善這項缺陷，並提升測試覆蓋率並減少無效請求。\cite{Alonso2023ARTE}
+
+早期技術如 ARTE，利用 Web of Data 的知識庫（如 DBpedia）結合 NLP 技術，從 API 規範中自動抽取真實的測試輸入，使 API 呼叫（valid API calls）成功的數量是隨機生成方法的兩倍以上，大幅提高了錯誤偵測能力。\cite{Alonso2023ARTE}更進一步的技術，如 RESTLess，利用ChatGPT執行資料增強，根據歷史有效參數建立大規模高語義的參數值資料集RTSet，用於補充或替換 OAS 中的參數值，以提高通過語法與語義檢查的成功率。\cite{Zheng2024RESTLess}LlamaRestTest 則透過對小型模型（如 Llama3-8B）進行微調（Fine-tuning）量化（Quantization），創建了專門的 LlamaREST-EX 模型，專注於生成特定領域的有效且真實的參數值。\cite{Kim2025LlamaRestTest}
+\subsubsection*{（三）改善測試腳本問題並提升測試執行準確性}
+LLM 驅動的測試技術不僅在生成階段發揮作用，在實際執行 V&V 流程中，也為傳統的測試腳本問題（Test Oracle Problem）提供了解決方案。雖然 LLM 在複雜計算與嚴格邏輯推理上仍有限制，導致在處理複雜問題時，其生成的測試案例的準確性會急劇下降（主要表現為 Assertion Error，即輸入輸出映射錯誤）。但藉由結合外部工具（如 Python 直譯器），能夠將測試輸出映射的複雜推理任務拆解為多個可控步驟。\cite{Anonymous2023LLMGenerators}
+
+例如 TestChain 的多代理架構中，LLM 能生成程式碼由直譯器執行，逐步完成資料處理與驗證，大幅提高測試案例的準確度。LlamaRestTest 更進一步，成為首個利用 LLM 動態整合伺服器回應的黑箱測試技術。在測試失敗響應（如 4xx）時，它能夠分析伺服器錯誤訊息與參數描述，從而於執行階段即時辨識並精煉及更新參數依賴性 (IPD) 規則和輸入值，使測試流程具備動態調整能力。\cite{Kim2025LlamaRestTest}
+
+\subsection{LLM測試技術發展歷程與里程碑}
+\subsection{自動化生成測試案例的優勢與挑戰}
+\subsection{Agents Flow 驗證機制的發展與創新理念}
+
+\section{生成式檢索增強生成技術的成熟度}
+\subsection{評估 (Now): 當前自主代理框架之景觀}
+
+\text 生成式 AI，特別是「檢索增強生成」 (Retrieval-Augmented Generation, RAG) (Lewis et al., 2020, arXiv:2005.11401) 技術的成熟，為上述威脅提供了潛在的解決方案——讓 AI 自主理解文件並生成測試。
+
+目前，業界已有多個主流框架嘗試實現此目標：
+
+1. LangChain (PaaS/Library):
+
+優勢： 提供了強大的「鏈」(Chains) 抽象化能力，是建構 RAG 流程與工具（Tools）的最佳選擇。
+
+劣勢： 其原生的 Agent 模組在處理複雜的多代理協調與狀態管理時，顯得較為僵化。
+
+2. LlamaIndex (Data Framework):
+
+優勢： 在「資料」層極為強大，專精於複雜資料源的索引 (Indexing) 與檢索 (Retrieval) (Liu et al., 2023, arXiv:2307.03668)。
+
+劣勢： 其核心設計更偏向「資料問答」，而非「任務執行與協調」。
+
+3. AutoGen (Agent Framework):
+
+優勢： Microsoft (Wu et al., 2023, arXiv:2308.08155) 提出的 AutoGen 框架，其核心是「多代理對話」(Multi-Agent Conversation)。它專精於定義不同角色的代理（如規劃師、工程師、執行者），並使其透過對話自主協調以完成複雜任務。
+
+劣勢： AutoGen 本身並不內建 RAG 或工具伺服器化的能力。
+
+LangChain 是建構「RAG 工具伺服器」的最佳選擇，而 AutoGen 則是建構「測試執行團隊（協調中心）」的最佳選擇。然而，目前學界與業界均缺乏一個將兩者優勢透過 MCP 協定進行標準化整合，並進一步透過 A2A 協定打通 SDLC 閉環的完整架構。
+
+\subsection{主流生成式AI框架比較}
+
+\section{人工智慧代理協定 (AI Agent Protocol) 的定義(MCP, A2A, ACP, ANP)}
+\section{AI 代理協定：定義與指引}
+
+\text 隨著 LLM 從單一的「模型」演進為可執行任務的「代理」(Agent)，業界迅速面臨了「互操作性」(Interoperability) 的挑戰。為解決此問題，兩個互補的開放協定應運而生：
+
+\subsection{人工智慧代理協定(AI Agent Protocol)的定義}
+
+1. 模型-情境協定 (Model Context Protocol, MCP)： MCP 由 Anthropic (2024) 提出，旨在標準化 AI 代理（Host）與外部「工具」或「資料」（Server）之間的通訊。其核心目標是垂直整合，將 LLM 從一個隔離的推理引擎，轉變為一個能安全、動態地存取外部 API、資料庫或資源的「工具使用者」(Tool-User) (Hou et al., 2025, arXiv:2503.23278)。
+
+2. 代理-代理協定 (Agent-to-Agent Protocol, A2A)： A2A 由 Google (2025) 提出，旨在標準化兩個或多個獨立 AI 代理之間的溝通。其核心目標是水平整合，允許不同供應商、不同框架建構的代理（Peers），能以類似「公司對公司」的模式進行協商、委派和協同作業 (Google, 2025, a2a-protocol.org)。
+
+3. 代理通訊協定 (Agent Communication Protocol, ACP)： ACP (Stone & Veloso, 1999; IBM, 2024) 則更專注於傳輸效能。它被定義為一個「本地化的低延遲智能總線」(Localized Low-Latency Intelligent Bus)，旨在為需要高吞吐量 (high-throughput) 與即時 (real-time) 協作的本地代理群（如本研究中的 AutoGen 團隊）提供一個高效能的內部通訊載體，以取代傳統 HTTP/JSON-RPC 的延遲。
+
+學界普遍認為，MCP 與 A2A 專注於「做什麼」（What - 標準化協作語意），而 ACP 則專注於「如何傳輸」（How - 高效能本地傳輸）。MCP/A2A 可以運行在 ACP 總線之上，實現兼具「標準化」與「高效能」的 AI 代理生態系 (Stride Consulting, 2025)。
+
+\subsection{MCP 核心架構指引}
+
+\text 大型語言模型 (LLM) 的原始設計是一個「無狀態」(stateless) 的系統，它本身無法存取外部世界，這極大地限制了其應用範圍。為此，MCP 不僅僅是一個 API 規格，更是一套完整的架構指引，其核心原則旨在建立一個安全、可控且可擴展的 AI 代理生態系。
+
+MCP 的關鍵設計指引包括：
+
+1. 嚴格的主從式 (Host-Server) 架構： MCP 強制定義了「Host」（主機，即 LLM 所在的應用程式）與「Server」（伺服器，即工具或資料的提供者）的關係。在此架構中，Host 擁有絕對的控制權。
+
+2. 安全沙盒化 (Sandboxing)： Server (工具) 永遠不能主動向 Host (主機) 發起請求，也無法讀取主機端的對話紀錄或系統狀態。Server 只能被動地回應 Host 的工具調用請求 (Anthropic, 2024)。
+
+3. 使用者同意 (User Consent) 為先： Host (主機) 負有全部的責任，必須在執行任何由 Server 提供的「具潛在危險」的工具（例如寫入檔案、執行 Git 命令或呼叫付費 API）之前，取得終端使用者的明確授權。
+
+4. 動態能力發現 (Dynamic Discovery)： Host (主機) 不需在編譯時期 (compile-time) 就知道 Server 的所有能力。Host 可以在運行時期 (run-time) 向 Server 詢問其提供的工具 (tools/list) 與資源 (resources/list)，使其具備高度的靈活性與可擴展性 (Hou et al., 2025)。
+
+遵循這些指引，MCP 成功地將 LLM 從一個「黑箱大腦」轉變為一個可被安全賦能的「總指揮中心」，這使得本研究中 AutoGen (Host) 與 LangChain (Server) 的職責分離架構得以實現。
+
+\subsection{A2A 核心架構指引}
+\subsection{分析 (How): 協定於軟體生命週期之定位}
+
+\text 若將此三協定置於軟體開發生命週期 (SDLC) 的脈絡下進行解構，它們恰好為「系統測試」提供了新的架構可能性。
+
+MCP 在此扮演了**「驗收測試驅動開發 (ATDD)」的促成者**。在 ATDD 思想中，測試案例應在開發前定義 (Gärtner, 2012)。然而，手動編寫這些案例成本高昂。MCP 協定使得一個 AI 代理 (Host) 能夠指揮一個 MCP Server（如本研究中的 LangChain 伺服器），使其具備讀取規格文件 (SA Docs) 並自動生成 ATDD 測試計畫的能力。
+
+A2A 則扮演了**「DevOps 閉環」的實現者**。傳統 CI/CD 的終點是「部署」(Deploy)，但文件的更新與錯誤的回報通常游離在外。A2A 協定允許測試系統（Host 1）在驗證成功後，能主動「委派」任務給另一個獨立的 GitOps 代理（Host 2），實現自動化的文件更新 與 PR 提交，從而完成 SDLC 的最後一哩路。
+
+ACP (本地智能總線) 則是實現這一切的效能基石。在本研究的地端化 (local-first) 架構中，AutoGen (Host) 內部的多個代理（Planner, Coder, Executor）之間需要進行高頻率的對話與 re-loop（反饋迴路）。若使用傳統 HTTP 通訊將產生巨大延遲，而 ACP 提供了必要的低延遲傳輸，確保了 re-loop 的即時性與可行性。
+
+
+\subsection{核心架構與應用}
+\subsection{代理人互通性與創新優勢}
+
+% \begin{table*}[htbp]
+%     \centering
+%     \caption{表格範例標題} \label{tab: complexity}
+%     \makebox[\linewidth][c]{
+%     \renewcommand\arraystretch{1.2}{
+%         \begin{tabular}{| l | c  c  c  c |}
+%         \hline
+%         Protocol & $P$ & $CS_1$ & $CS_2$ & $RG$ \\
+%         \hline
+%         MSSMul & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         SC & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         \hline 
+%         \end {tabular}
+%     }}
+% \end {table*}
+
+% \section{模型說明（小標）}
+
+% 說明說明說明說明，說明說明說明說明說明說明說明說明說明說明說明說明，說明說明說明說明說明說明說明說明。
+
+% \begin{figure*}[htbp]
+%     \centering
+%     \includegraphics[width = 0.5\textwidth]{image.jpeg}
+%     \caption{Cool train station}
+%     \label{fig: image}
+% \end{figure*}
+
+\end{ZhChapter}

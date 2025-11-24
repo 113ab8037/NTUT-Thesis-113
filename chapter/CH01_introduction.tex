@@ -1,0 +1,163 @@
+\begin{ZhChapter}
+
+\chapter{緒論}
+
+\section{軟體開發中的系統測試}
+\text 近十年間，軟體開發產業正以前所未有的高速發展。\cite{Bajaj2019SystematicReviewTCP}在敏捷開發（Agile）、持續整合與部署（Continuous Integration / Continuous Deployment, CI/CD） 技術的推動下，以及透過微服務（Microservices，屬於高度分散式服務範疇）等架構，開發團隊得以實施持續更新（continuous updates），並在極短時間內完成程式修改、測試到上線部署的全流程，從而大幅提升產品迭代頻率與市場回應速度。然而，這種追求開發速度的飛躍，也進一步凸顯了軟體工程中長期存在的一項結構性矛盾（Structural contradiction）：即開發效率的提升與品質保證（Quality Assurance, QA）機制之間的非同步性。
+在高頻率的版本更新與快速交付環境下，每一次功能增修都可能導致多個服務的重新部署，造成所謂的狀態爆炸（State explosion）」。這種不斷變化的系統狀態，使得經典的驗證與確認（Systematic Verification and Validation, V\&V）方法難以執行。儘管系統能夠迅速上線，但傳統測試腳本、驗證邏輯與技術文件往往無法匹配此節奏，造成測試覆蓋率不足、缺陷追蹤效率下降，以及下降文件與實際系統狀態之間的「知識漂移」（Documentation Drift），加劇了系統複雜性與可用能力之間的鴻溝。此即形成了所謂的「速度與品質落差」，開發節奏不斷加快，而品質驗證與知識管理機制卻相對滯後，使得組織在追求開發效率與維持系統可靠性之間陷入結構性取捨。
+軟體品質不足而導致的產品召回和法律訴訟數量正在迅速增加。軟體驅動的風險和問題（包括缺陷、網路安全攻擊和可用性不足）持續穩步增長。在此背景下，系統測試的目的就是檢查完全整合後的產品是否符合規格要求。對於安全性關鍵系統（safety-critical systems），系統測試必須提供層級化的軟體保證並證明其可信賴性，確保產品在多個維度上的品質，功能性（Functional suitability）、安全性（Security）、可用性（Usability）、可維護性（Maintainability）。
+由於法律風險和高昂的經濟成本，系統測試的地位已經從低優先級活動轉變為開發流程中不可或缺的核心要素，從需求工程階段就開始整合。在軟體日益複雜的背景下，系統測試是維持系統穩健性（robustness）與營運成功的核心環節，儘管這必須依賴高度自動化來實現。\cite{TestingSoftwareSystems}
+
+\section{RESTful API語法正確性與語義一致性}
+
+\text 軟體開發產業已從早期的單體式應用（Monolithic Architecture）演進至現代的微服務（Microservices）核心組件。\cite{Kim2025LlamaRestTest}REST API以其輕量、快速且可擴展的特性，成為雲端服務的核心入口。\cite{Zheng2024RESTLess}現代軟體系統普遍透過 HTTP 協議，提供對雲端資源的CRUD（Create, Read, Update, Delete）操作服務。\cite{Nguyen2024KAT}由於REST API在現代雲端服務中的關鍵作用，確保其品質變得日益重要，其影響服務的可靠性與使用者體驗。而系統測試（System Testing）通常涵蓋驗收測試（Acceptance Testing）是為確保系統功能正確性及符合其功能需求的驗證活動。\cite{Wang2020AutomaticGeneration}然而，隨著微服務與CI/CD帶來的快速迭代節奏，傳統的API測試方法逐漸暴露出不足之處。
+\subsubsection*{（一）傳統測試的局限與自動化瓶頸}
+自動化測試在面對敏捷開發及持續整合與部署（CI/CD）所驅動的高速迭代時，仍面臨多重結構性的問題。傳統API測試高度依賴專家經驗，透過擷取API流量和手動定義的規則來生成測試請求，這對於自動化構成了重大挑戰。\cite{Zheng2024RESTLess}這種方法通常要求測試人員手動為每個非平凡的輸入參數設定有意義的有效測試輸入，即建立和維護資料字典（data dictionaries），因此效率極低。\cite{Alonso2023ARTE}此外，傳統方式高度依賴專家知識且耗時，透過擷取API流量和手動定義的規則來生成測試請求。這對於越來越複雜、參數越來越多的雲端API來說，很快就會失效，且大量產生無意義的請求。\cite{Zheng2024RESTLess}
+為實現API測試的自動化，近年來的RESTful API自動化測試執行的挑戰和相應技術研究主要採用黑箱測試（Black-box testing），\cite{Alonso2023ARTE}使用OpenAPI（Swagger）規格檔作為輸入，透過自動推論API之間的依賴關係（例如操作依賴圖，ODG），並依據此依賴關係依序產生測試序列，隨後自動分析回應。然而，在對這些最先進（SOTA）的模糊測試工具（Fuzzers，如RESTler、Morest、RESTTESTGEN、Miner等）進行實測後，研究者觀察到兩個普遍且嚴重的重大瓶頸：工具無法產生「語意完整」且「足夠長」的測試序列，\cite{Zheng2024RESTLess}這對全面覆蓋End-to-end的驗證構成了挑戰：
+\begin{enumerate}
+    \item 因為測試工具用「亂數」或「字典」產生參數，導致生成的輸入數據缺乏語義真實性。雲端服務的API Gateway會執行嚴格的語法/語義解析（syntax/semantic check）。一堆不合理的JSON結構、型別錯誤、無效ID都會立刻被拒絕，造成大量 400 / 422 錯誤（客戶端錯誤），進而使實際能進到後端邏輯的請求非常少。\cite{Zheng2024RESTLess}這種隨機或結構錯誤的輸入難以有效觸發API的核心邏輯。例如，隨機生成方法只能產生20％的有效API 呼叫。\cite{Alonso2023ARTE}
+    \item 現有工具生成的序列通常長度不足，難以觸發雲端服務中難以到達的狀態。這是由於序列生成策略沒有考慮「參數必要性」，也沒辦法產生複雜、跨資源依賴的操作鏈。例如，需要依序執行「建立group」、「建立project」、「建立issue」等複雜操作鏈，若序列只有1或2步，則根本不可能觸發API交互造成的邏輯漏洞。 \cite{Zheng2024RESTLess} 
+\end{enumerate}
+\subsubsection*{（二）RESTLess優化案例}
+在自動化測試領域中，如何生成同時具備語法正確性（syntactic validity）與語義一致性（semantic coherence）的測試輸入資料，一直是最具代表性的挑戰之一。\cite{Alonso2023ARTE}RESTLess正是為了解決上述「語義不足」與「序列不夠長」這兩大限制而提出的技術。透過大規模語義增強資料集RTSet，RESTLess能夠顯著提升參數合理性，並改善序列推論能力。\cite{Zheng2024RESTLess}
+本研究將以RESTLess為基礎參考，使用JSON檔作為輸入規格，結合LLM的語意推論能力自動產生更合理的請求參數值與操作序列，並採用基於權重的優化算法，將必要參數視為高權重。透過調整渲染機率，以推論更長、更具多樣性、具跨資源依賴關係的API呼叫序列，以作為具備全面覆蓋End-to-End驗證自動化測試腳本的基礎生成。 \cite{Zheng2024RESTLess}
+在測試腳本執行後，針對結果進行分析（特別是偵測50X錯誤碼），並據以產生測試報告。
+
+\section{標準化且模組化的AI Agents生態協定}
+\text 在當前軟體產業追求高速疊代，致使CI/CD pipeline因傳統測試維護瓶頸而日益承壓之際，人工智慧領域發生了根本性的轉變。\cite{Borghoff2025Beyond}自Transformer架構被提出後，為大型語言模型（Large Language Models, LLMs）湧現能力（Emergent Abilities），包括上下文學習（In-context Learning）等特殊能力。\cite{Wang2024Software}
+\text LLM 的興起標誌著一個從針對單一任務的「專用 AI」（或傳統機器學習模型）到能夠處理多樣化任務的「通用 AI」（或通用認知引擎，General Cognitive Engine）的典範轉移。LLM不僅具備強大的語言理解、規劃和推理能力，\cite{Xu2025FlexFL}還能透過「少樣本提示」（Few-shot Prompting）來處理多樣化的任務。\cite{Wang2024Software}這種轉變催生了巨大的產業需求，企業意識到LLM能夠作為一個通用的認知引擎，用於加速知識工作者的核心任務。\cite{Bandi2025Rise}在軟體工程領域，這股需求迅速轉化為利用LLM來理解非結構化的技術文件與半結構化的程式碼（如API規格），並生成結構化的產出（如測試腳本與技術文件）。\cite{Wang2024Software}
+\subsection*{（一）LLM 在系統測試中的需求與自主代理的興起}
+\text 大型語言模型的出現為解決軟體測試中長期存在的效率與成本問題帶來了突破性的契機。\cite{Wang2024Software}LLM具備的自然語言理解與程式碼生成能力，使其能夠從API規格（如 OpenAPI Specification）中提取結構與語義資訊，\cite{Xu2025FlexFL}自動產生測試腳本、輸入資料及驗證條件，\cite{Wang2024Software}並在不同系統模組間建立上下文關聯。\cite{Hou2025MCP}這種能力使測試流程得以在語義層面（semantic level）進行自動化推理與生成，\cite{Xu2025FlexFL}從而顯著降低人工維護成本與回饋週期。
+\text 進一步地，隨著資訊技術（IT）自動化的演進，基於LLM的自主代理（AI Agents）系統已成為新一代智能測試與運維自動化的關鍵推手。\cite{Hou2025MCP}\cite{Bandi2025Rise}AI Agent（AI 代理）自主的軟體實體，它感知環境（例如使用者查詢、感測器數據）、推理並採取行動（例如使用者查詢、感測器數據）來完成特定任務或目標。\cite{Bandi2025Rise}然而，這個術語常被稀釋，用來描述缺乏自主性、持久記憶或真正協調能力的組件，例如LangChain和AutoGen某些簡單的流程，或OpenAI Cookbook中的硬編碼腳本，常被誤稱為「代理」。\cite{Borghoff2025Beyond}相較之下，Agentic AI（代理式 AI）多代理系統（Multi-Agent Systems, MAS），其中多個專業代理協作、協調並規劃，以實現複雜、高層次的目標。Agentic AI 是一種自主的、目標驅動的系統，能夠在極少人類監督下，長時間獨立運作。\cite{Bandi2025Rise}模組化多代理系統透過明確定義的協議進行協調，能夠執行複雜的、多步驟的任務。\cite{Borghoff2025Beyond}
+\subsection*{（二）多代理通訊協定的協作}
+\text 在軟體工程領域，多代理系統被用於自動化軟體測試、故障定位（Fault Localization, FL）\cite{Xu2025FlexFL}、程式碼生成\cite{Fatima2023Flakify}以及其他複雜的 IT 運維工作流程。\cite{Bandi2025Rise}這些系統能夠分解複雜任務、規劃多步驟流程，並透過工具調用與外部服務互動，實現從測試生成到結果收斂的全流程自動化。然而，當前的LLM原生框架（如LangGraph\cite{Borghoff2025Beyond}、LangChain\cite{Ehtesham2025SurveyMCPACPA2AANP}和AutoGen\cite{Borghoff2025Beyond}）主要透過連續提示鏈（sequential prompt chaining）集中式LLM協調來模擬自主性。TB-CSPN 的研究指出，核心問題在於這些架構將語義理解與流程協調混為一談，（conflate semantic processing with orchestration），導致例行性的流程管理任務仍需要昂貴的 LLM 推理，導致例行性的流程管理任務仍需要昂貴的LLM推理，限制了可擴展性與真正的自主性。此外，多代理系統的擴展與整合仍面臨嚴重挑戰，例如缺乏標準化的通訊協定導致互通性受限、協作困難（如數據存取不一致和通訊延遲）與安全性風險升高。\cite{Borghoff2025Beyond}
+\text 為應對上述挑戰，業界開始提出標準化的通訊協議，包括2024年Anthropic推出模型上下文協定（Model Context Protocol, MCP）、Google於2025年4月推出代理人間協定（Agent-to-Agent Protocol, A2A）、同年（2025年）7月IBM推出Agent Communication Protocol (ACP)等，這些協定旨在將分散的AI生態系統轉變為穩健、安全且可互通的代理網路。\cite{Ehtesham2025SurveyMCPACPA2AANP}透過結合AI間的協定，能夠建立一個兼具上下文感知調用（context-aware invocation）與去中心化任務協作（decentralized orchestration），分離語義處理（LLM 擅長）和協調邏輯（形式化方法擅長）的生成式AI框架。因此，本研究的成果將致力於在軟體工程和AI自動化領域中，其具體的技術洞見，實現高效、可驗證且可擴展的代理式AI系統，探索相關混合架構（Hybrid Architecture）的可行性與優勢。
+
+\section{自動化測試生成與驗證流程概述}
+
+\text 人工智慧（AI），尤其是大型語言模型（Large Language Models, LLMs）的崛起，為軟體測試的自動化生成與驗證流程帶來了根本性的轉變。基於Transformer的LLM不僅掌握語言理解，也能進行推理、規劃，使其能夠執行傳統上需要人類智慧的複雜任務。在軟體開發領域中，透過零樣本（Zero-shot）和少樣本（Few-shot）學習能力，\cite{Ehtesham2025SurveyMCPACPA2AANP}LLM能輕易地從規格文件中提取結構和語義資訊，並轉換為可執行的測試腳本及案例。\cite{Nguyen2024KAT}\cite{Wang2024Software}相關研究已證實此能力：例如UMTG透過自然語言處理（NLP）技術從使用案例規範（Use Case Specifications）中萃取物件約束語言（OCL）約束，進而自動生成測試輸入數據及測試腳本（Test Oracle）；\cite{Wang2020AutomaticGeneration}KAT使用GPT模型自動生成RESTful API的操作依賴圖（ODGs）、測試腳本、約束驗證腳本、測試案例及測試資料；\cite{Nguyen2024KAT}estChain等多代理框架結合LLM與Python執行器，以ReAct格式的對話鏈中與Python直譯器互動，來大幅提高生成測試輸出的準確性。\cite{Anonymous2023LLMGenerators}
+
+\text 本研究提出並驗證一套基於A2A與MCP雙協定整合的創新多代理系統，用於實現高效能的RESTful API自動化黑箱測試（Black-box testing）。此架構利用AutoGen開源框架的多代理框架\cite{Ehtesham2025SurveyMCPACPA2AANP}作為代理間協作的A2A Host進行任務協調。首先，測試流程透過系統測試目標RESTful API提供的OpenAPI標準JSON輸入檔開始，\cite{Nguyen2024KAT}呼叫模型上下文協定（Model Context Protocol, MCP）服務，以整合外部第三方工具和資源程式庫（LangChain），進行API item資料處理及分類。LangChain提供抽象化能力，可建立模組化的工作流程，並具有內建支援向量儲存（vector stores）和檢索器的功能。\cite{Ehtesham2025SurveyMCPACPA2AANP}為了加強LLM代理的推理品質，本研究也會將手動SA文件（manual document），包括操作步驟、測試目的、輸入值、前置條件及預期結果等要素，透過FastMCP伺服器以加速上下文傳輸回傳A2A Host。在系統測試中引入manual document作為上下文，可以提供語義知識，類似於ARTE透過知識庫（Web of Data）來生成語義有效的測試輸入，從而提高測試腳本準確率。\cite{Alonso2023ARTE}
+
+\text 為了實現複雜的測試任務協作，本研究進一步引入一個多代理（Multi-Agent）系統，包括Planner Agent（負責任務分解與規劃）\cite{Bandi2025Rise}、Test Coder Agent（負責生成程式碼腳本）\cite{Anonymous2023LLMGenerators}、Executor Agent（負責執行 API 呼叫以及Analyzer Agent（負責分析執行結果）。這些代理共同進行測試腳本生成及執行測試，並經過多次re-loop迭代，\cite{Bandi2025Rise}以實現從失敗中學習並持續提升生成品質，回傳成功或失敗的測試結果。最後，在獲得執行結果後，流程再次呼叫MCP server的LangChain作為Reporter Agent，整合API前處理資訊與執行結果，產生完整的測試報告。\cite{Ehtesham2025SurveyMCPACPA2AANP}
+
+\text 在這個多代理協作過程中，代理人間協定（Agent-to-Agent Protocol, A2A）的作用至關重要。A2A以標準化的資料結構管理代理之間的狀態傳遞，使任務委派過程具一致性，以實現協作式任務執行。隨後，系統將這些狀態物件完整傳遞至LangChain Agent，作為上下文提供給MCP的工具調用機制。藉由A2A與MCP的混合架構（Hybrid Architecture），本研究實現了代理間的水平協作溝通（A2A）與模型對工具使用的垂直整合（MCP）的明確分工，有效解決在複雜測試流程中的任務協調成本與上下文一致性問題。此架構的核心價值在於建構一個安全、可擴展且可互通的代理式AI生態系統，有效地將LLM的語義推理能力與形式化方法的協調優勢結合，以應對現代軟體測試的挑戰。\cite{Borghoff2025Beyond}
+
+\section{研究目標}
+
+本研究主要解決當前軟體測試領域在RESTful API自動化測試整體的效率問題，提出並驗證一套有效可實際落地的RESTful API黑箱測試自動化流程的整合框架，將Agent-to-Agent協定（A2A）與Model Context Protocol（MCP）結合，透過混合式多代理架構，明確劃分了代理間的溝通與工具的使用，並在測試時自動化驗證，最終目標在於提升自動化測試的整體正確性，以降低維護成本及回饋週期。
+
+本研究旨在實現以下具體目標：
+\begin{enumerate}
+    \item 提出A2A結合MCP的多協定混合架構：建立一套結合水平代理協作（A2A）與垂直工具整合（MCP）的系統，明確分離語義推理與任務協調，提升代理協作的穩定性與可擴充性。
+    \item 建構可自動化生成、執行與驗證的RESTful API測試流程：利用開放標準（OpenAPI）、文件上下文與多代理分工，形成一套可re-loop修正且語義一致的完整測試Pipeline。
+    \item 驗證混合式多代理架構在測試準確性的效果驗證：透過實驗與無混合式多代理架構下比較，評估系統在生成測試腳本品質、測試結果一致性與工具協作效率上的優勢。
+\end{enumerate}
+
+\section{研究架構}
+\text 本研究主要探討如何讓企業在營運產品的開發測試與客戶服務串接，具體為微服務架構系統進行可執行的自動化測試與結果生成，藉由大型語言模型多代理式及A2A與MCP的混合架構提升測試正確性及一致性。依循論文結構規劃，共分為五章：
+
+\text 第一章為緒論，說明研究背景、問題來源、研究動機，並介紹 AI 代理、多協定混合架構及RESTful API測試自動化的相關概念，最後提出研究目標與整體研究架構。
+
+\text 第二章為文獻探討，回顧系統測試、自動化測試、LLM測試技術、Agentic Workflow、MCP、A2A，以及多代理系統的相關研究，歸納現有方法的限制與研究缺口。
+
+\text 第三章為研究方法，詳細說明本研究提出的混合式代理架構設計，包括系統流程、代理角色分工、A2A資料結構、MCP工具調用流程、LLM推理策略與整體測試自動化方法。
+
+\text 第四章為研究結果與討論，將展示實驗結果，包括測試腳本生成品質、測試成功率、上下文一致性、代理協作成本，以及與現有方法的比較與分析。
+
+\text 第五章為結論與未來展望，將總結本研究實驗成果、技術貢獻及其限制，並提出未來在多代理架構互通的生態下標準化與形式化驗證的混合架構擴展及智能軟體工程應用的可能方向。
+
+
+% \begin{equation} 
+%     \mbox{$x = \dfrac{-b\pm\sqrt{b^2-4ac}}{2a}$}
+% \end{equation}
+
+% \subsection{研究背景(小小標)}
+
+% \text 背景內文背景內文背景內文背景內文,背景內文背景內文背景內文背景內文背景內文背景內文，如表 1.1 所示。
+
+% \begin{table*}[htbp]
+%     \centering
+%     \caption{表格範例標題} \label{tab: complexity}
+%     \makebox[\linewidth][c]{
+%     \renewcommand\arraystretch{1.2}{
+%         \begin{tabular}{| l | c  c  c  c |}
+%         \hline
+%         Protocol & $P$ & $CS_1$ & $CS_2$ & $RG$ \\
+%         \hline
+%         SD & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(1)$, N/A & $O(n-t)$, $O(1)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         MSSMul & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         MSSAdd & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & N/A, N/A, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         SC & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         \hline 
+%         \end {tabular}
+%     }}
+% \end {table*}
+
+% \subsubsection{研究動機(小小標)}
+
+% \begin{equation} 
+%     \mbox{$(1+x)^n = 1 + \dfrac{nx}{1!} + \dfrac{n(n-1)x^2}{2!}$}
+% \end{equation}
+
+% 動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。
+
+% 動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機。動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機。動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，如圖 1.1、圖 1.2 所示。
+
+% \begin{figure*}[htbp]
+%     \centering
+%     \includegraphics[width = 1\textwidth]{image.jpeg}
+%     \caption{Cool train station}
+%     \label{fig: image}
+% \end{figure*}
+
+% \begin{figure*}[htbp]
+%     \centering
+%     \includegraphics[width = 1\textwidth]{image.jpeg}
+%     \caption{"Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station" "Cool train station"}
+%     \label{fig: image}
+% \end{figure*}
+
+% \begin{figure*}[htbp]
+%     \centering
+%     \includegraphics[width = 1\textwidth]{image.jpeg}
+%     \caption{Cool train station}
+%     \label{fig: image}
+% \end{figure*}
+
+% \begin{table*}[htbp]
+%     \centering
+%     \caption{表格範例標題} \label{tab: complexity}
+%     \makebox[\linewidth][c]{
+%     \renewcommand\arraystretch{1.2}{
+%         \begin{tabular}{| l | c  c  c  c |}
+%         \hline
+%         Protocol & $P$ & $CS_1$ & $CS_2$ & $RG$ \\
+%         \hline
+%         MSSMul & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         MSSAdd & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & N/A, N/A, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         SC & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         MSSMul & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         MSSAdd & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & N/A, N/A, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         SC & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
+%         \hline 
+%         \end {tabular}
+%     }}
+% \end {table*}
+
+% 動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。
+
+% 動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。
+
+% 動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。
+
+% 動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。動機動機動機動機，動機動機動機動機動機動機動機動機動機動機動機動機，動機動機動機動機動機動機動機動機。
+
+% \begin{figure*}[htbp]
+%     \centering
+%     \includegraphics[width = 0.5\textwidth]{image.jpeg}
+%     \caption{Cool train station}
+%     \label{fig: image}
+% \end{figure*}
+
+\end{ZhChapter}

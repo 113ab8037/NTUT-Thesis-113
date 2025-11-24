@@ -1,0 +1,96 @@
+%%{init: {
+  "flowchart": {
+    "ranksep": 80,
+    "nodesep": 60
+  }
+}}%%
+graph TD
+    subgraph 使用者介面  GUI 
+        direction TB
+        User[👤 使用者] -- 發起任務 --> UI[<b>Streamlit UI</b><br> 任務發起點 ]
+        
+    end
+    subgraph Framework
+        subgraph 總指揮中心  MCP Host - AutoGen
+            direction TB
+            UI -- 提供SUT規格  --> Wrapper[<b>FastAPI Server</b><br> 接收 UI 請求 ]
+
+            subgraph AutoGen 代理團隊
+                direction LR
+                Planner[<b>Planner Agent</b><br> 總規劃師 ]
+                Coder[<b>Test_Coder_Agent</b><br> 生成 Script ]
+                Executor[<b>Executor_Agent</b><br> 執行測試 ]
+                Analyzer[<b>Analyzer_Agent</b><br> 分析 / re-loop ]
+                Reporter[<b>Reporter_Agent</b><br> 生成報告/文件 ]
+            end
+
+            A2A_Client[<b>A2A Client Agent</b><br> 對外聯絡窗口 ]
+            Client_MCP[<b>MCP Client</b><br> 內部工具客戶端 ]
+
+            Wrapper -- 1.  喚醒  --> Planner
+            Planner -- 2.  指揮  --> Client_MCP
+            Planner --  6. 分派  --> Coder --  7. 提交  --> Executor --  8. 回傳  --> Analyzer
+            Analyzer --  9. re-loop  --> Coder
+            Analyzer --  10. 成功  --> Planner
+            Planner -- 11.  彙總結果  --> Reporter
+            Reporter -- 12.  生成[文件]  --> Planner
+            Planner -- 13.  指揮委派  --> A2A_Client
+            
+            
+        end
+        
+        subgraph 工具伺服器 MCP Server 
+            direction TB
+            
+            Server_MCP[<b> MCP Server - LangChain </b><br> 策略師 ]
+            subgraph C1 [LangChain 核心工具]
+                Tools[<b>LangChain Tools</b><br> RAG / 案例 / Input生成]
+                
+            end
+            Tools -- 讀取規格文件 － OpenAPI.json, SA Docs  --> VDB
+            Server_MCP -- 4. 執行 --> Tools
+            VDB[<b>VDB ChromaDB</b><br> 儲存 SUT 規格/SA 文件]
+            
+        end
+
+        subgraph 待測系統 - System Under Test
+            SUT[<b>RESTful 網站 www </b><br> 被動的測試目標 <br>]
+            
+        end
+
+        subgraph 基礎設施  Infrastructure 
+            OLLAMA[<b>Ollama LLM</b><br> Llama 3 / Gemma ]
+        end
+
+        subgraph Peer Agent  外部代理 
+            direction TB
+            GitOps_Host[<b>GitOps Agent  Host 2 </b><br> 獨立的 CI/CD 代理 ]
+            Git_Repo[<b>SUT 的 Git Repository</b><br> e.g., GitHub / GitLab ]
+            GitOps_Host -- 15.  執行 Git 操作  --> Git_Repo
+        end
+    end
+    %% --- 資訊流  Information Flow  --- %%
+    
+    %% 流程 1: AutoGen 呼叫 LangChain  MCP 協定 - 垂直 
+    Client_MCP -- 3.  MCP Request  --> Server_MCP
+   
+    Server_MCP -- 5.  MCP Response  --> Client_MCP
+
+    %% 流程 2: AutoGen 呼叫 SUT  HTTP 協定 
+    Executor --  HTTP Test Request  --> SUT
+
+    SUT --  HTTP Test Response  --> Executor
+
+    %% ---------------------------------------------- %%
+    %% 流程 3: AutoGen 呼叫 Peer Agent  A2A 協定 - 水平 
+    %% 這是您的新需求！
+    A2A_Client -- 14.  <b>A2A Request</b><br>  請幫我開 PR 並提供[文件]   --> GitOps_Host
+    GitOps_Host --  A2A Response<br>  PR 連結: ...   --> A2A_Client
+    %% ---------------------------------------------- %%
+
+    %% 流程 4: LLM 呼叫  本地 API 
+    Planner --  呼叫思考  --> OLLAMA
+    Reporter --  呼叫生成報告  --> OLLAMA
+    Tools --  呼叫RAG/生成Input  --> OLLAMA
+
+    OLLAMA  --> Wrapper -- 16.  顯示[最終報告+PR]  --> UI
