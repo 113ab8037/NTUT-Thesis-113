@@ -28,7 +28,7 @@
 \text LLM 的興起標誌著一個從針對單一任務的「專用 AI」（或傳統機器學習模型）到能夠處理多樣化任務的「通用 AI」（或通用認知引擎，General Cognitive Engine）的典範轉移。LLM不僅具備強大的語言理解、規劃和推理能力，\cite{Xu2025FlexFL}還能透過「少樣本提示」（Few-shot Prompting）來處理多樣化的任務。\cite{Wang2024Software}這種轉變催生了巨大的產業需求，企業意識到LLM能夠作為一個通用的認知引擎，用於加速知識工作者的核心任務。\cite{Bandi2025Rise}在軟體工程領域，這股需求迅速轉化為利用LLM來理解非結構化的技術文件與半結構化的程式碼（如API規格），並生成結構化的產出（如測試腳本與技術文件）。\cite{Wang2024Software}
 \subsection*{（一）LLM 在系統測試中的需求與自主代理的興起}
 \text 大型語言模型的出現為解決軟體測試中長期存在的效率與成本問題帶來了突破性的契機。\cite{Wang2024Software}LLM具備的自然語言理解與程式碼生成能力，使其能夠從API規格（如 OpenAPI Specification）中提取結構與語義資訊，\cite{Xu2025FlexFL}自動產生測試腳本、輸入資料及驗證條件，\cite{Wang2024Software}並在不同系統模組間建立上下文關聯。\cite{Hou2025MCP}這種能力使測試流程得以在語義層面（semantic level）進行自動化推理與生成，\cite{Xu2025FlexFL}從而顯著降低人工維護成本與回饋週期。
-\text 進一步地，隨著資訊技術（IT）自動化的演進，基於LLM的自主代理（AI Agents）系統已成為新一代智能測試與運維自動化的關鍵推手。\cite{Hou2025MCP}\cite{Bandi2025Rise}AI Agent（AI 代理）自主的軟體實體，它感知環境（例如使用者查詢、感測器數據）、推理並採取行動（例如使用者查詢、感測器數據）來完成特定任務或目標。\cite{Bandi2025Rise}然而，這個術語常被稀釋，用來描述缺乏自主性、持久記憶或真正協調能力的組件，例如LangChain和AutoGen某些簡單的流程，或OpenAI Cookbook中的硬編碼腳本，常被誤稱為「代理」。\cite{Borghoff2025Beyond}相較之下，Agentic AI（代理式 AI）多代理系統（Multi-Agent Systems, MAS），其中多個專業代理協作、協調並規劃，以實現複雜、高層次的目標。Agentic AI 是一種自主的、目標驅動的系統，能夠在極少人類監督下，長時間獨立運作。\cite{Bandi2025Rise}模組化多代理系統透過明確定義的協議進行協調，能夠執行複雜的、多步驟的任務。\cite{Borghoff2025Beyond}
+\text 進一步地，隨著資訊技術（IT）自動化的演進，基於LLM的自主代理（AI Agents）系統已成為新一代自動化測試與維運的關鍵推手。\cite{Hou2025MCP}\cite{Bandi2025Rise}要理解這一範式轉變，首先必須區分「AI 代理」與「代理式 AI」。
 \subsection*{（二）多代理通訊協定的協作}
 \text 在軟體工程領域，多代理系統被用於自動化軟體測試、故障定位（Fault Localization, FL）\cite{Xu2025FlexFL}、程式碼生成\cite{Fatima2023Flakify}以及其他複雜的 IT 運維工作流程。\cite{Bandi2025Rise}這些系統能夠分解複雜任務、規劃多步驟流程，並透過工具調用與外部服務互動，實現從測試生成到結果收斂的全流程自動化。然而，當前的LLM原生框架（如LangGraph\cite{Borghoff2025Beyond}、LangChain\cite{Ehtesham2025SurveyMCPACPA2AANP}和AutoGen\cite{Borghoff2025Beyond}）主要透過連續提示鏈（sequential prompt chaining）集中式LLM協調來模擬自主性。TB-CSPN 的研究指出，核心問題在於這些架構將語義理解與流程協調混為一談，（conflate semantic processing with orchestration），導致例行性的流程管理任務仍需要昂貴的 LLM 推理，導致例行性的流程管理任務仍需要昂貴的LLM推理，限制了可擴展性與真正的自主性。此外，多代理系統的擴展與整合仍面臨嚴重挑戰，例如缺乏標準化的通訊協定導致互通性受限、協作困難（如數據存取不一致和通訊延遲）與安全性風險升高。\cite{Borghoff2025Beyond}
 \text 為應對上述挑戰，業界開始提出標準化的通訊協議，包括2024年Anthropic推出模型上下文協定（Model Context Protocol, MCP）、Google於2025年4月推出代理人間協定（Agent-to-Agent Protocol, A2A）、同年（2025年）7月IBM推出Agent Communication Protocol (ACP)等，這些協定旨在將分散的AI生態系統轉變為穩健、安全且可互通的代理網路。\cite{Ehtesham2025SurveyMCPACPA2AANP}透過結合AI間的協定，能夠建立一個兼具上下文感知調用（context-aware invocation）與去中心化任務協作（decentralized orchestration），分離語義處理（LLM 擅長）和協調邏輯（形式化方法擅長）的生成式AI框架。因此，本研究的成果將致力於在軟體工程和AI自動化領域中，其具體的技術洞見，實現高效、可驗證且可擴展的代理式AI系統，探索相關混合架構（Hybrid Architecture）的可行性與優勢。
@@ -41,11 +41,11 @@
 
 \text 為了實現複雜的測試任務協作，本研究進一步引入一個多代理（Multi-Agent）系統，包括Planner Agent（負責任務分解與規劃）\cite{Bandi2025Rise}、Test Coder Agent（負責生成程式碼腳本）\cite{Anonymous2023LLMGenerators}、Executor Agent（負責執行 API 呼叫以及Analyzer Agent（負責分析執行結果）。這些代理共同進行測試腳本生成及執行測試，並經過多次re-loop迭代，\cite{Bandi2025Rise}以實現從失敗中學習並持續提升生成品質，回傳成功或失敗的測試結果。最後，在獲得執行結果後，流程再次呼叫MCP server的LangChain作為Reporter Agent，整合API前處理資訊與執行結果，產生完整的測試報告。\cite{Ehtesham2025SurveyMCPACPA2AANP}
 
-\text 在這個多代理協作過程中，代理人間協定（Agent-to-Agent Protocol, A2A）的作用至關重要。A2A以標準化的資料結構管理代理之間的狀態傳遞，使任務委派過程具一致性，以實現協作式任務執行。隨後，系統將這些狀態物件完整傳遞至LangChain Agent，作為上下文提供給MCP的工具調用機制。藉由A2A與MCP的混合架構（Hybrid Architecture），本研究實現了代理間的水平協作溝通（A2A）與模型對工具使用的垂直整合（MCP）的明確分工，有效解決在複雜測試流程中的任務協調成本與上下文一致性問題。此架構的核心價值在於建構一個安全、可擴展且可互通的代理式AI生態系統，有效地將LLM的語義推理能力與形式化方法的協調優勢結合，以應對現代軟體測試的挑戰。\cite{Borghoff2025Beyond}
+\text 在這個多代理協作過程中，A2A的作用至關重要。A2A以標準化的資料結構管理代理之間的狀態傳遞，使任務委派過程具一致性，以實現協作式任務執行。隨後，系統將這些狀態物件完整傳遞至LangChain Agent，作為上下文提供給MCP的工具調用機制。藉由A2A與MCP的混合架構（Hybrid Architecture），本研究實現了代理間的水平協作溝通（A2A）與模型對工具使用的垂直整合（MCP）的明確分工，有效解決在複雜測試流程中的任務協調成本與上下文一致性問題。此架構的核心價值在於建構一個安全、可擴展且可互通的代理式AI生態系統，有效地將LLM的語義推理能力與形式化方法的協調優勢結合，以應對現代軟體測試的挑戰。\cite{Borghoff2025Beyond}
 
 \section{研究目標}
 
-本研究主要解決當前軟體測試領域在RESTful API自動化測試整體的效率問題，提出並驗證一套有效可實際落地的RESTful API黑箱測試自動化流程的整合框架，將Agent-to-Agent協定（A2A）與Model Context Protocol（MCP）結合，透過混合式多代理架構，明確劃分了代理間的溝通與工具的使用，並在測試時自動化驗證，最終目標在於提升自動化測試的整體正確性，以降低維護成本及回饋週期。
+本研究主要解決當前軟體測試領域在RESTful API自動化測試整體的效率問題，提出並驗證一套有效可實際落地的RESTful API黑箱測試自動化流程的整合框架，將A2A與MCP結合，透過混合式多代理架構，明確劃分了代理間的溝通與工具的使用，並在測試時自動化驗證，最終目標在於提升自動化測試的整體正確性，以降低維護成本及回饋週期。
 
 本研究旨在實現以下具體目標：
 \begin{enumerate}

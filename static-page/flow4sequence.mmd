@@ -1,0 +1,49 @@
+%%{init: {
+  "flowchart": {
+    "ranksep": 80,
+    "nodesep": 60
+  }
+}}%%
+sequenceDiagram
+    participant U as User/System Trigger
+    participant P as Planner Agent (A2A)
+    participant C as Test_Coder Agent (A2A)
+    participant E as Executor Agent (A2A)
+    participant A as Analyzer Agent (A2A)
+    participant R as FastMCP (MCP Host)
+    participant T as SUT
+    participant L as LangChain
+    participant G as GitOps Agent (A2A Host 2)
+
+    Note over U,L: 階段 I: 輸入與前置處理 (MCP)
+    U->P: 1. 提供OpenAPI JSON/Manual Doc
+    P->R: MCP Call
+    R->L: 2. 請求API Item分類(JSON/Context)
+    L->R: 3. 回傳分類結果/處理後Context
+    R-->P: MCP Response
+
+    Note over P,E: 階段 II/III: 測試迴圈 (A2A)
+    P->C: 4. A2A Task: 請求生成測試腳本(含MCP Context)
+    C->E: 5. A2A Task: 執行測試腳本
+    E->T: 6. 執行測試目標 (SUT API Call)
+    T-->E: 7. 測試原始結果 (Raw Result)
+    E->A: 8. A2A Task: 回傳執行結果
+    A->A: 9. 內部分析 (結果 vs. 預期值)
+    alt 測試失敗 (Re-loop)
+        A->P: 10. A2A Feedback: 測試失敗(含失敗原因)
+        P->C: 11. A2A Re-loop: 請求修復腳本
+    else 測試成功
+        A->P: 10. A2A Feedback: 測試成功
+        P->G: 12. A2A Task: 請求執行Git操作 (跨主機)
+    end
+
+    Note over P,G: 階段 IV: CI/CD GitOps (A2A 跨主機)
+    G->G: 13. 執行 Git Repository操作
+    G-->P: 14. A2A Response: Git操作成功/失敗狀態
+
+    Note over P,L: 階段 V: 報告生成 (MCP)
+    P->R: MCP Call
+    R->L: 15. 請求生成最終測試報告(所有A2A/MCP Context)
+    L->R: 16. 最終測試報告
+    R-->P: MCP Response
+    P->U: 17. 回傳測試結果報告及CI/CD pipeline結果
