@@ -120,16 +120,19 @@
     \end{itemize}
 \end{enumerate}
 
-\text 這種主要透過連續提示鏈（sequential prompt chaining）集中式LLM介導的協調（LLM-mediated coordination）來模擬自主性，導致例行性的流程管理任務仍需要昂貴的LLM推理，嚴重限制了效能和可擴展性。
-\text 作為對比，TB-CSPN（Topic-Based Communication Space Petri Net）等混合架構，透過將語義處理（LLM 擅長）與協調邏輯（Petri Net 擅長）分開，展現了顯著的優勢。實證評估顯示，TB-CSPN 比 LangGraph 風格的協調快 62.5\%，LLM API 呼叫減少 66.7\%，證明了架構分離的效率。
+\text 這種主要透過連續提示鏈（sequential prompt chaining）集中式LLM介導的協調（LLM-mediated coordination）來模擬自主性，導致例行性的流程管理任務仍需要昂貴的LLM推理，嚴重限制了效能和可擴展性。儘管這些LLM原生框架存在上述缺陷，但本研究所提出的自動化測試框架提供了一套初步的解決方案。
+\text 形式化架構如TB-CSPN（Topic-Based Communication Space Petri Net）的實驗結果證明，透過將語義處理（LLM 擅長）與協調邏輯（Petri Net 擅長）分開，可以顯著提升效率，展現了顯著的優勢。實證評估顯示，TB-CSPN比LangGraph風格的協調快 62.5\%，LLM API 呼叫減少 66.7\%，證明了架構分離的效率。
 \text 此外，多代理系統的擴展與整合仍面臨嚴重挑戰，例如缺乏標準化的通訊協定導致互通性受限、協作困難（如資料存取不一致和通訊延遲）與安全性風險升高。\cite{Borghoff2025Beyond}
 
-\text 本研究所提出的自動化測試框架將綜合LangChain的程式庫和AutoGen的Agent Framework的優勢作整合。
-\text 本研究採用AutoGen框架作為協調基石，引入Planner Agent（策劃與協調）、Test Coder Agent（測試腳本生成）、Executor Agent（腳本執行）和Analyzer Agent（結果分析與比較）四大關鍵角色。這些Agent將透過標準化的資料結構進行狀態傳遞，確保任務在不同階段無縫交接。LangChain將作為專業工具庫（Programmatic Libraries）前置處理與分類服務，以及結合前置處理的分類上下文來生成詳盡且結構化的測試報告。
+\text 本研究所提出的自動化測試混合式架構框架將綜合LangChain的程式庫和AutoGen的Agent Framework的優勢作整合，透過雙協定劃分達成了類似的職責分離（Separation of Concerns）目的，使AutoGen的缺陷得以緩解。
+\text 本研究採用AutoGen框架作為協調基石，以A2A Host的角色（AutoGen 是一個支持 A2A 協作的 AgentOS） \cite{Wu2023AutoGen}，嚴格限制其職責於水平的任務委派與結構化狀態傳遞，這確保了流程控制的靈活性與協調性。同時，引入Planner Agent（策劃與協調）、Test Coder Agent（測試腳本生成）、Executor Agent（腳本執行）和Analyzer Agent（結果分析與比較）四大關鍵角色。這些Agent將透過標準化的資料結構進行狀態傳遞，確保任務在不同階段無縫交接，從而有效地緩解了集中式LLM協調帶來的效率和擴展性瓶頸。
+\text FastMCP提供的上下文感知層 (Contextual Awareness Layer)確保了跨代理和工具間的上下文一致性，被垂直委託給FastMCP Server，由LangChain程式庫將作為專業工具庫（Programmatic Libraries）前置處理與分類服務，進行昂貴的語義推理（例如REST API規格語義增強）、複雜上下文感知的任務，以及結合前置處理的分類上下文來生成詳盡且結構化的測試報告。
 \text 本研究的整合架構，透過AutoGen實現了流程的靈活性與協調性，同時透過LangChain實現了工具使用的準確性與專業性。這種結合不僅為API測試自動化提供了一個強大、可重複驗證的框架，也為未來更複雜的多領域、跨協議Agent協作研究奠定了堅實的基礎。
 
-
 \section{Multi-Agent自動生成測試案例與Hybrid Architecture的協作}
+\text 傳統RESTful API模糊測試（Fuzzing）在雲端服務運算（Cloud Service Computing）中面臨的嚴峻挑戰，如何生成高語義品質且足夠長的測試序列，以通過嚴格的雲端閘道檢查並觸發深藏於複雜操作組合中的錯誤。儘管大型語言模型（LLM）因其卓越的自然語言理解及推理能力而被視為解決方案，特別是在增強規格語義\cite{Zheng2024RESTLess}和處理複雜依賴性方面\cite{Nguyen2024KAT}，現有的LLM原生框架在架構上仍存在固有缺陷。
+\text 為了構建一個安全、可擴展且可互通的代理式AI生態系統\cite{Ehtesham2025SurveyMCPACPA2AANP}，本章節將介紹採用近期主流廠商推出的A2A（Agent-to-Agent）和MCP（Model Context Protocol）兩大新興標準協議。\cite{Borghoff2025Beyond}
+
 \subsection{Multi-Agent自動化生成測試案例}
 \text LLM驅動的多代理系統(Multi-Agent Systems, MAS)正成為自動化測試案例生成領域的重大前沿，旨在克服單一LLM或傳統測試框架在處理複雜任務（特別是涉及規劃和高精度計算）時的固有限制。多代理協作利用分工（specialization）結構化通訊（structured communication）、形式化協調（formal coordination），大幅提升了測試用例的準確性、多樣性及自動化效率。\cite{Anonymous2023LLMGenerators}\cite{Bandi2025Rise}\cite{Hosseini2025Role}\cite{Borghoff2025Beyond}
 
@@ -223,9 +226,11 @@
 \text MCP與A2A混合架構（Hybrid Architecture）結合了A2A的結構化訊息傳遞和能力發現，以及MCP的上下文感知機制，它使得LLM能夠以一致且安全的方式存取外部資料和工具，為可擴展、可互通、且安全的多代理生態系統奠定基礎。這種雙協議整合解決了跨協議通訊中的能力表徵、上下文轉換和訊息路由等關鍵挑戰。整合層在協議格式之間進行轉換，確保在一個協議中建立的上下文在透過另一個協議存取時仍保持一致。
 \text 然而，有研究也警告，這類協議的組合可能會引入語義不匹配、安全性風險和協調複雜性，需要像TB-CSPN這種形式化混合架構來策略性地嵌入AI組件，以提供協調保證和更高的效率。\cite{Borghoff2025Beyond}因此，為解決前述研究所指的挑戰，本研究之自動化測試腳本生成預處理將以RESTLess為基礎。
 
-\text 基於上述研究，本研究提出的自動化測試框架將綜合LangChain的程式庫及AutoGen的Multi-Agent Framework的框架，結合MCP與A2A雙協定的混合架構下的框架。採用AutoGen框架作為代理間協作的A2A主機（A2A Host）。AutoGen透過會話互動（conversational interactions）基於提示的協調來模擬自主性。雖然AutoGen依賴提示式協調而非形式化協議，但它在本研究中提供了流程的靈活性與協調性，體現了A2A在結構化互動和任務委派上的作用。同時利用LangChain程式庫，透過FastMCP伺服器實現工具服務的MCP專業能力。LangChain提供強大的程式庫和抽象化能力來串聯LLM呼叫和函數調用，這使其成為實現MCP垂直整合和上下文感知工具調用的理想選擇。
+\text 基於上述研究，本研究提出的自動化測試框架將綜合LangChain的程式庫及AutoGen的Multi-Agent Framework的框架，結合MCP與A2A雙協定的混合架構下的框架。採用AutoGen框架作為代理間協作的A2A主機（A2A Host）。AutoGen透過會話互動（conversational interactions）基於提示的協調來模擬自主性。
+\text 雖然本研究採用AutoGen作為協調基石，但其選擇是基於對A2A協議的實務可行性和輕量級載體的考量，而非對其原生協調機制的盲目依賴。本框架透過「雙協定劃分」實現了職責分離（Separation of Concerns），AutoGen依賴提示式協調而非形式化協議，它在本研究中提供了流程的靈活性與協調性，體現了A2A在結構化狀態資料的管理互動和水平的任務委派上的作用，確保了代理間狀態傳遞的一致性，避免了集中式LLM協調的效率和擴展性瓶頸。\cite{Wu2023AutoGen}
+\text 把真正需要昂貴LLM推理的任務，例如執行RESTLess的語義優化和上下文感知的專業工具調用，垂直委託給FastMCP Server執行（Conversation），實現工具服務的MCP專業能力。由LangChain提供強大的程式庫和抽象化能力來串聯LLM呼叫和函數調用，這使其成為實現MCP垂直整合和上下文感知工具調用的理想選擇。\cite{Tupe2024MultiAgentCollaboration}
 
-\text 這種設計明確劃分了代理間的溝通與工具的使用，從而解決了複雜測試流程中任務協調和上下文一致性的挑戰。透過AutoGen的協作（類A2A）實現了流程的靈活性，同時透過LangChain的工具呼叫（類MCP）實現了工具使用的準確性與專業性。這種雙協議的結合，為API測試自動化提供了一個強大、可重複驗證的框架，也為未來更複雜的多領域、跨協議Agent協作研究奠定了堅實的基礎。
+\text 本框架透過將AutoGen的使用從「集中式LLM協調」的缺陷中剝離出來，將其重新定義為「A2A結構化任務委派的實施載體」，並用A2A和MCP雙協定架構分離來證明其優勢，\cite{Tupe2024MultiAgentCollaboration}這種設計明確劃分了代理間的溝通與工具的使用，從而解決了複雜測試流程中任務協調和上下文一致性的挑戰。透過AutoGen的協作（類A2A）實現了流程的靈活性，同時透過LangChain的工具呼叫（類MCP）實現了工具使用的準確性與專業性。這種雙協議的結合，已被IT事件響應等複雜的實際案例所驗證，證明了A2A與MCP雙協定整合的可行性與優勢，為API測試自動化提供了一個強大、可重複驗證的框架，也為未來更複雜的多領域、跨協議Agent協作研究奠定了堅實的基礎。
 
 
 \text 

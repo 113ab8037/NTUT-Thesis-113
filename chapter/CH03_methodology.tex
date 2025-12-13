@@ -55,16 +55,16 @@
 \section{前置處理的理論與設計}
 \text 為建構具備高語義品質的核心上下文（Core Context），此上下文對於後續代理（Agent）生成有效且能通過雲端閘道檢查的測試腳本至關重要。本階段的設計核心，在於整合模型上下文協議（MCP）的垂直整合優勢，以及源於RESTLess框架的語義優化策略。
 
-\text 此階段的理論基礎聚焦於克服僅依賴原始OpenAPI規範作為測試輸入的侷限性。傳統的 REST API 模糊測試（Fuzzing）方法，其挑戰在於生成的請求序列普遍缺乏業務語義價值，從而導致大量的語義缺失請求在雲端閘道層被語法或業務邏輯檢查所阻擋，嚴重影響測試效率。
+\text 此階段的理論基礎聚焦於克服僅依賴原始OpenAPI規範作為測試輸入的侷限性，特別是解決黑箱測試中長期存在的測試腳本問題（Test Oracle Problem）。傳統的REST API模糊測試（Fuzzing）方法，其挑戰在於生成的請求序列普遍缺乏業務語義價值，從而導致大量的語義缺失請求在雲端閘道層被語法或業務邏輯檢查所阻擋，嚴重影響測試效率。
 \text 為解決此問題，本研究引入MCP作為上下文感知層（Contextual Awareness Layer），以確保跨Agent與工具間的語義一致性。Planner Agent作為FastMCP Client，透過呼叫FastMCP Server（其工具互動層由LangChain程式庫提供支持），實現對規格數據和人類知識的安全且一致性存取。此外，我們整合了基於LLM的規格語義優化模組（LLM-Based Specification Semantic Optimization），此模組旨在增強原始OpenAPI規範的語義豐富度，進而提升有效請求序列的通過率。
 
-\text 本階段的實施流程旨在將非結構化或半結構化輸入轉化為高語義的結構化上下文，其步驟如下：
-\text 系統首先接收兩類輸入：OpenAPI JSON檔案（定義API結構與參數名稱）和Manual Document（包含高語義測試案例、預期結果及操作步驟等）。由Planner Agent隨即透過A2A協定發出任務，並作為FastMCP Client呼叫FastMCP服務，以執行API item的資料處理與分類。
-\text 在 FastMCP 服務內部，嵌入的 LLM-Based Semantic Optimization 模組執行語義增強演算法：
+\text 本階段的實施流程旨在將非結構化或半結構化輸入轉化為高語義的結構化上下文，為確保跨代理與工具間的語義一致性，本研究對 Manual Document（包含預期結果及操作步驟等）的依賴是一種經過深思熟慮的技術權衡，用以確保測試的語義一致性與回傳正確性。在複雜的RESTful API系統中，傳統方法難以在缺乏形式化斷言的情況下自動判定系統的端到端（End-to-end）輸出是否正確。輸入內容包括OpenAPI JSON檔案（定義API結構與參數名稱）和Manual Document（包含高語義測試案例、預期結果及操作步驟等），其中的人類預期結果（Human Expected Results）為 Analyzer Agent 提供了核心測試案例，這是驗證系統功能性，確保測試結果正確性所必需的黃金標準。同時，該文件也提供了高語義測試案例的初始骨架，確保了LLM後續擴增的數據具備語義真實性。
+\text 為了緩解人工維護帶來的成本與「知識漂移」的結構性矛盾，本研究利用LLM的能力實現自動化語義增強。Planner Agent作為FastMCP Client，隨即透過A2A協定發出任務，並作為FastMCP Client，呼叫FastMCP服務（由 LangChain 程式庫支持的工具互動層），以執行API item的資料處理與分類，實現對規格數據和人類知識的安全且一致性存取。
+\text 在FastMCP服務內部，嵌入的LLM-Based Semantic Optimization組執行語義增強演算法：
 
 \begin{enumerate}
-    \item 模組透過精確的 Prompt Engineering，指示底層 LLM 學習原始規範中參數的潛在語義（例如，從名稱判斷用途），並生成多個語義相似且具代表性的參數值集合（RTSet）。
-    \item 緊接著，LLM 自動掃描原始 OpenAPI 規範，將生成的 para-value 鍵值對從 RTSet 替換或補充到對應參數的 enum 字段中。此步驟旨在確保 Test Coder Agent 能夠存取到具備業務語義的有效輸入值，而非隨機生成的無效數據。
+    \item 模組透過精確的Prompt Engineering，指示底層 LLM 學習原始規範中參數的潛在語義（例如，從名稱判斷用途），並生成多個語義相似且具代表性的參數值集合（RTSet）。
+    \item 緊接著，LLM自動掃描原始OpenAPI規範，將生成的para-value鍵值對從 RTSet 替換或補充到對應參數的enum字段中。此步驟旨在確保Test Coder Agent能夠存取到具備業務語義的有效輸入值，而非隨機生成的無效數據。
 \end{enumerate}
 
 \text 經過FastMCP服務處理後，最終的輸出結果（包括分類結果、語義增強後的規格，以及Manual Document中包含的人類預期結果）將被標準化封裝成核心上下文（Core Context）。此核心上下文作為A2A狀態資料結構的一部分，被注入到測試流程中。此機制確保了後續的Test Coder Agent在生成腳本時，能夠在語法和語義上都依據一個一致且強化過的測試依據，從而大幅提升測試腳本的準確率和有效性。
@@ -215,13 +215,13 @@
 
 \text 這個階段的設計，確保了整個LLM代理測試流程具備持久性和問責性，因為每一個決策和結果都能夠在最終的結構化報告中找到清晰、一致的記錄。
 \text 整個雙協定整合的流程，從資料輸入到最終報告生成，就像是一個智慧化工廠：A2A協定是生產線上的工人之間傳遞指令和半成品（任務委派和執行結果），而MCP協定則像是中央管理系統，持續記錄所有工作步驟、使用的工具及最終的品質檢測數據，確保最終出廠的產品（測試報告）是完整且可驗證的。
-% 為實現上述目標，本研究提出之「自主測試與文件生成框架 (V-Final)」如下圖 1-1 所示。
-% \begin{figure*}[htbp]
-%     \centering
-%     \includegraphics[width = 1.0\textwidth]{static-page/architecture.png}
-%     \caption{Cool train station}
-%     \label{fig: image}
-% \end{figure*}
+為實現上述目標，本研究提出之「雙協定混合架構框架」之架構圖，如下圖3.1所示。
+\begin{figure*}[htbp]
+    \centering
+    \includegraphics[width = 1.0\textwidth]{static-page/SystemArchitectureDiagram.png}
+    \caption{System Architecture Diagram}
+    \label{fig: image}
+\end{figure*}
 
 % \begin{table*}[htbp]
 %     \centering
