@@ -5,6 +5,20 @@
 \end{center}
 
 \renewcommand{\bibfont}{\fontsize{12}{20pt}\selectfont}
-\printbibliography[keyword=cjk]
+\nocite{*}
+\textbf{中文文獻}
+
+\vspace{0.5\baselineskip}
+
+目前文獻資料尚未設定 \texttt{keyword=cjk} 等可供自動分區之欄位，因此本版先保留中英文分區標題，待後續補齊文獻標記後再啟用中文文獻自動分類。
+
+\vspace{\baselineskip}
+
+\textbf{英文文獻}
+
 \renewcommand{\bibfont}{\fontsize{12}{15pt}\selectfont}
-\printbibliography[notkeyword=cjk,heading=none]
+\begingroup
+\setlength{\emergencystretch}{3em}
+\hbadness=10000
+\printbibliography[heading=none]
+\endgroup

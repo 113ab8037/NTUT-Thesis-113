@@ -4,250 +4,1115 @@
 
 \section{研究架構與整體流程}
 
-\text 本章節根據文獻探討對於RESTLess混合優化策略，與本研究提出的自動化測試框架採用創新的分散式雙主機架構（Distributed Dual-Host Architecture）融合，其核心優勢在於實現責任隔離與協議互操作性。基於對A2A協定和MCP協定的雙協定整合的流程設計，RESTLess的兩大優化策略將分別應用於不同的代理人（Agent）和階段，以最大化LLM的專業分工和雙協定（A2A與MCP）的優勢，旨在克服傳統單一LLM代理框架在上下文一致性和跨主機任務協調方面的挑戰。整體流程圍繞五大關鍵階段展開，從接收測試需求開始，透過代理間的結構化通訊和專業工具整合，最終輸出完整的測試報告，並自動化銜接CI/CD流程中的Git操作。
-\text 首先，由Planner Agent啟動流程，將OpenAPI JSON輸入檔及Manual Document，透過呼叫FastMCP服務作為外部工具知識庫進行執行資料處理及垂直整合；接著，針對回傳的測試條件後，由Planner Agent使用A2A協定的任務委派模式，將生成測試腳本的任務傳遞給Test Coder Agent及Executor Agent進行腳本生成與執行；第三階段為結果分析與自校準，Executor Agent將原始的執行結果（包括HTTP狀態碼狀態碼2XX/4XX/5XX），透過A2A協定回傳給Analyzer Agent，若失敗時會啟動Re-loop流程，將失敗原因和當前狀態，回饋給Planner Agent，並指派Test Coder Agent進行修復性代碼生成；最後，進而再次呼叫FastMCP服務，啟動Reporter Agent執行外部操作（GitOps），完成最終報告生成與結案，並發送A2A請求給位於Host 2上的GitOps Agent，允許代理跨越協議邊界進行協作。
+\text 本研究提出一套結合多代理協作、工作流程控制與執行恢復機制之RESTful API 自動化測試框架。系統以 OpenAPI 規格與人工分析文件為主要輸入，透過大型語言模型之語意推理能力，支援參數約束推斷、請求-回應依賴推理（request-response dependency inference）與測試案例生成，以提升測試輸入之語意合理性與可執行性。在執行恢復層面，本研究將 API 執行後之工作流程決策形式化為馬可夫決策過程（Markov Decision Process），使系統能根據執行結果選擇後續行動，而非於首次失敗時即終止測試流程。本研究設計並比較兩種決策策略：rule-based 策略作為可解釋之基準，Offline-Q策略則作為學習型決策之可行性探索，兩者共同構成工作流程恢復層之比較基礎。
+\text 在技術架構層面，系統整合AutoGen與LangGraph代理框架，並引入MCP與A2A雙協定實現職責分離（Separation of Concerns）：MCP負責工具與上下文之垂直存取，A2A負責代理間之水平任務交接，LangGraph 則統一管理工作流程節點順序與狀態傳遞。\text 此框架以LangGraph作為工作流控制層，負責控制測試流程中的節點順序、狀態保存、條件分支、重試與終止條件；以AutoGen 作為協作推理層，於特定節點中執行多代理語意分析、依賴推斷、約束衝突檢查與測試案例審查；並透過LangChain整合LLM呼叫、工具使用與結構化輸出解析。為了支援跨代理與跨工具的資訊交換，本研究進一步引入MCP與A2A的概念。MCP用於代理對外部工具、OpenAPI規格、串接規格與執行外部資訊存取的垂直資訊存取；A2A則用於代理之間的水平任務交接與結構化分析結果傳遞。透過此設計，多代理系統不直接控制整體流程，而是在LangGraph所定義的節點中執行受限的語意推理任務，以降低長流程任務中的不可預期行為。
+\text 在RESTful API測試中，OpenAPI 規格雖然能描述結構化資訊，但對於欄位語意、業務規則、跨操作依賴與實際可用參數值的描述仍然有限。既有 RESTfulAPI測試研究指出，自動化測試工具在處理 REST API 時常遭遇測試輸入缺乏語意、操作序列過短、依賴推斷不足與測試 oracle 不明確等問題 \cite{Golmohammadi2024Testing}\cite{Zhang2024Open}\cite{OracleProblemSurvey}。RESTLess進一步指出，傳統模糊測試工具若僅依賴隨機值或簡單字典產生參數，容易產生大量語意無效的請求，導致請求在API閘門或後端驗證階段即被拒絕\cite{Zheng2024RESTLess}。KAT與LlamaRestTest則分別顯示，大型語言模型可用於推斷OpenAPI中的操作依賴與參數依賴，並可利用伺服器回應改善測試輸入與依賴規則\cite{Nguyen2024KAT}\cite{Kim2025LlamaRestTest}。
+\text 基於上述問題，於測試工作流程真實API執行條件下是否能持續進行是本研究關注之核心問題，而非單次請求任務。實際API測試過程中，系統可能遭遇授權狀態改變、資源不存在、語義驗證失敗、伺服器錯誤、網路逾時或外部環境不可用等狀態。若測試流程僅以單次HTTP回應作為成敗判定，將容易使整個流程過早停止，進而降低測試資料之可用性與評估結果之穩定性。因此，本研究將API測試流程中的動態執行狀態視為工作流程決策問題，加上權衡各技術的優勢與限制，為API測試自動化設計整體系統架構採用了多階層功能模組的環境及工作流程。在研究方法上，本研究將RESTful API測試流程拆解為三種層次的架構面。
+\text 在測試流程方面，本研究將RESTful API測試分為五個主要層級：規格語意理解、測試案例生成、測試程式生成、API執行，以及自動化分析層與工作流程決策層。系統首先解析OpenAPI規格（Specification）、規格文件與歷史執行紀錄，取得API端點（Endpoint）、參數（Parameter）、 資料格式（Schema）、身分驗證（Authentication）與回應狀態（Response Status）等資訊；接著透過LLM與多代理協作推斷語意約束、請求-回應依賴（Request-Response dependency）與潛在衝突；再根據語意約束與依賴推理（Dependency Inference）生成具商業邏輯合理性的測試案例與請求序列（Request Sequence）。最後，系統執行產生的測試程式，收集HTTP狀態碼（HTTP Status Code）、回應主體（Response body）、錯誤類型（Error Type）與延遲時間（Latency），並將執行結果轉換為工作流程決策狀態，以支援後續的測試調整與評估。
+\text 第一為環境架構，說明LLM在LangChain框架下結合AutoGen、LangGraph如何利用MCP、A2A協定形成可控制的多代理傳輸與協作測試環境。第二為系統架構，將整體系統分為五個功能層級，包含規格語意理解、測試案例生成、測試程式生成、API執行，以及分析與工作流程決策。第三為工作流程架構，使用LangGraph節點定義測試流程中的節點、輸入、輸出與狀態轉移方式。
 
-\subsection{主機劃分與角色分配}
+\subsection{環境架構之職責分離}
+\text OpenAPI規格文件是描述RESTful API的標準化規格，提供標準、開放的格式定義API的資源與操作，常用格式為JSON或YAML。通常能提供介面結構、參數格式與回應，但無法完整描述業務規則、跨操作依賴關係、資料約束條件以及實際使用情境，因此僅依靠單一大型語言模型進行規格理解與測試案例生成時，容易造成上下文混亂、任務邊界不清與流程不可重現。容易產生語意理解不足、推論偏差或測試案例品質不一致等問題。由於RESTful API測試流程同時包含規格理解、語意推理、資料轉換、請求執行、結果分析與流程判斷等不同性質的任務，若全部交由單一大型語言模型或單一代理處理，將提高上下文混亂、任務邊界不清與結果不可重播之風險，因此有必要將語意推理、流程控制與執行決策加以分離。
+\text 為提升規格理解能力與測試內容品質，本研究建置多代理協作模組（Multi-Agent Collaboration Module），透過多個具備不同職責之代理人（Agent）共同參與規格分析、需求推理、測試案例審查與決策討論，使系統能夠在測試案例生成前完成較完整之規格理解與語意約束分析。本模組以AutoGen作為多代理協作框架，並結合代理人對代理人協定（Agent-to-Agent Protocol, A2A）實現代理間資訊交換機制，使規格知識、測試策略與執行結果能於代理之間傳遞與共享。
+\text 多代理協作模組位於OpenAPI規格解析模組與測試案例生成模組之間，其主要功能為將OpenAPI規格、Manual Document、Gold Path與MCP Context轉換為可供後續測試生成使用之語意知識。其中Agent Factory負責建立各類型代理人；Multi-Agent Discussion Workflow負責代理人討論流程；A2A Communication Layer則負責代理之間的訊息交換與知識傳遞。
+\text 不同代理人負責不同層級之推理工作，使系統能夠將規格分析、測試設計與執行分析進行職責分離，降低單一代理負責所有任務所造成之推理負擔。其中Discussion Trace用於記錄代理人之間的討論歷程；Specification Discussion Result則保存討論後之規格分析結果；Finalized Specification則作為後續測試案例生成之主要輸入。
 
-\text 本研究提出了一個高度模組化且具備跨系統協作能力的自動化測試生成與驗證框架。此框架的核心理念是結合A2A協定實現代理間的任務協調與狀態傳遞，並透過MCP協定實現上下文感知的專業工具服務。整個系統由兩個邏輯隔離的主機和六個專業代理共同驅動。
-\text 本架構由兩組獨立的主機環境組成，整體流程涵蓋四個主要大角色與協定任務：AutoGen Host、FastMCP Client、FastMCP Server、External A2A Host、GitOps Host，以及六個代理Agents與子任務: Planner Agent、Test Coder Agent、Executor Agent、Analyzer Agent、Reporter Agent、GitOps Agent，，以達成功能隔離和安全分權，以下為詳細分權及說明：
-\begin{enumerate}
-    \item Host 1：AutoGen A2A Host (測試與分析主機)
-    \begin{itemize}
-        \item 角色定位： 作為主要的A2A 控制中心和 FastMCP Client，負責整個測試流程的生命週期管理。
-        \item 組成與任務： 包含 Planner Agent、Test Coder Agent、Executor Agent、Analyzer Agent 四個核心 Agent。它也是 FastMCP Server 的物理部署位置，並在內部以 LangChain 庫的形式提供專業的 MCP 工具服務（例如：API Item 前置處理、報告生成）。
-        \item 協議職責： 主導 Host 1 內部 Agent 間的 A2A 協作，並作為 A2A Client 向 Host 2 的 External A2A Host 發送跨主機請求。
-    \end{itemize}
-    \item Host 2：External A2A Host / GitOps Host (部署與操作主機)
-    \begin{itemize}
-        \item 角色定位： 作為 A2A Server，專門接收來自 Host 1 的高權限操作請求，實現安全隔離。
-        \item 組成與任務： 僅包含 GitOps Agent。該 Agent 負責對 SUT (System Under Test) 的 Git Repository 執行所有 Git 操作，例如版本標記（Tag）、分支合併（Merge）等。
-        \item 協議職責： 透過 A2A 介面接收 Host 1 的任務，執行 GitOps 流程，並將操作的成功或失敗狀態回傳給 Host 1，確保了測試與部署環境的權責分離。
-    \end{itemize}
-\end{enumerate}
+\text 規格討論流程對應工作流程中的Semantic Constraint Reasoning節點，當OpenAPI規格完成解析後，系統將OpenAPI內容、Manual Document、Gold Path與MCP Context送入多代理協作模組。
+\text 首先由QA Agent從測試觀點分析規格需求與驗證重點；接著由Developer Agent分析API設計邏輯、資源依賴與操作順序；最後由Moderator Agent整合各代理意見並形成最終規格結論。此流程之主要目的是建立比原始OpenAPI規格更完整的語意描述，並產生後續測試生成所需之約束條件。
 
-\subsection{自動化測試生成與驗證流程概述}
-\text 整個自動化流程是一套由A2A協議驅動的閉環（Closed-Loop）協作，其中MCP協議在關鍵節點提供專業能力與上下文一致性。各階段間之互動說明如下：
-\subsubsection*{階段（一）輸入與前置處理（Input \& Pre-processing）}
-\text 本階段將以接收使用者提供的OpenAPI JSON檔案（定義測試目標）與Manual Document（包含預期結果及操作步驟等，作為高語義測試案例）。整體服務流程由Planner Agent啟動，透過呼叫FastMCP（由LangChain程式庫支持的工具互動層），執行API item的資料處理與分類。此MCP服務中將嵌入LLM-Based Specification Semantic Optimization模組（類似RESTLess的語義增強演算法）。處理後的分類結果和Manual Document（包含人類預期結果）一同被封裝成核心上下文（Core Context），作為A2A狀態資料結構的一部分，注入到測試流程中。
-
-\subsubsection*{階段（二）腳本生成與執行（Code Generation \& Execution）}
-\text 接繼使用A2A協定的任務委派模式，將生成測試腳本的任務傳遞給Test Coder Agent，依據A2A狀態資料中包含的MCP Context（即語義增強後的規格），實施Weight-Based Render Order Optimization策略（類似RESTLess的渲染順序優化）。
-\text 然後，透過機率ω調整 來決定是否添加低權重（Non-Required）參數進行測試，從而生成更長、更多樣化的測試序列，以檢測隱藏在複雜操作組合中的錯誤。腳本隨後被傳遞給Executor Agent，執行針對測試目標進行RESTful API的黑箱測試。
-
-\subsubsection*{階段（三）結果分析與自校準（Analysis \& Self-Correction）}
-\text 在此階段，Executor Agent及Analyzer Agent扮演自動化測試流程驗證與修正的重要橋樑，流程如下：
-\begin{enumerate}
-    \item Executor Agent將原始的執行結果（包括 HTTP 狀態碼 20X/50X）透過A2A協定回傳給Analyzer Agent。
-    \item Analyzer Agent利用Manual Document提供的預期結果進行結果比對（即測試案例），判斷測試成功或失敗。
-    \begin{itemize}
-        \item Re-loop機制（自校準）：若失敗，Analyzer Agent將失敗原因和當前狀態（維持在 MCP Context中）回饋給Planner Agent。Planner Agent啟動Re-loop流程，指派Test Coder Agent進行修復性代碼生成，直至測試成功。
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{階段（四）CI/CD外部操作（GitOps Integration）}
-\text 階段（三），一旦測試成功，Executor Agent（類似於IT事件響應系統中報告解決狀態的代理）發送A2A請求給GitOps Host的GitOps Agent。此實施展現了雙協定的互通性，允許代理跨越協議邊界進行協作。
-\text GitOps Agent接收A2A結構化請求後，執行相關的Git操作（例如打Tag、Merge Branch或Pull Request），實現從測試到部署的自動化銜接。
-
-\subsubsection*{階段（五）報告生成與結案（Reporting \& Closure）}
-\text 最後，Analyzer Agent回傳資料給Planner Agent後將再次呼叫FastMCP服務，啟動Reporter Agent。透過MCP協定的上下文感知層，存取並整合整個A2A流程的所有日誌、執行結果、Manual Document的預期值，以及前置處理的分類結果。MCP在此階段確保了所有工具和代理在整個複雜流程中上下文的一致性，最終生成一份完整且結構化的最終測試報告。
-
-\section{前置處理的理論與設計}
-\text 為建構具備高語義品質的核心上下文（Core Context），此上下文對於後續代理（Agent）生成有效且能通過雲端閘道檢查的測試腳本至關重要。本階段的設計核心，在於整合模型上下文協議（MCP）的垂直整合優勢，以及源於RESTLess框架的語義優化策略。
-
-\text 此階段的理論基礎聚焦於克服僅依賴原始OpenAPI規範作為測試輸入的侷限性，特別是解決黑箱測試中長期存在的測試腳本問題（Test Oracle Problem）。傳統的REST API模糊測試（Fuzzing）方法，其挑戰在於生成的請求序列普遍缺乏業務語義價值，從而導致大量的語義缺失請求在雲端閘道層被語法或業務邏輯檢查所阻擋，嚴重影響測試效率。
-\text 為解決此問題，本研究引入MCP作為上下文感知層（Contextual Awareness Layer），以確保跨Agent與工具間的語義一致性。Planner Agent作為FastMCP Client，透過呼叫FastMCP Server（其工具互動層由LangChain程式庫提供支持），實現對規格數據和人類知識的安全且一致性存取。此外，我們整合了基於LLM的規格語義優化模組（LLM-Based Specification Semantic Optimization），此模組旨在增強原始OpenAPI規範的語義豐富度，進而提升有效請求序列的通過率。
-
-\text 本階段的實施流程旨在將非結構化或半結構化輸入轉化為高語義的結構化上下文，為確保跨代理與工具間的語義一致性，本研究對 Manual Document（包含預期結果及操作步驟等）的依賴是一種經過深思熟慮的技術權衡，用以確保測試的語義一致性與回傳正確性。在複雜的RESTful API系統中，傳統方法難以在缺乏形式化斷言的情況下自動判定系統的端到端（End-to-end）輸出是否正確。輸入內容包括OpenAPI JSON檔案（定義API結構與參數名稱）和Manual Document（包含高語義測試案例、預期結果及操作步驟等），其中的人類預期結果（Human Expected Results）為 Analyzer Agent 提供了核心測試案例，這是驗證系統功能性，確保測試結果正確性所必需的黃金標準。同時，該文件也提供了高語義測試案例的初始骨架，確保了LLM後續擴增的數據具備語義真實性。
-\text 為了緩解人工維護帶來的成本與「知識漂移」的結構性矛盾，本研究利用LLM的能力實現自動化語義增強。Planner Agent作為FastMCP Client，隨即透過A2A協定發出任務，並作為FastMCP Client，呼叫FastMCP服務（由 LangChain 程式庫支持的工具互動層），以執行API item的資料處理與分類，實現對規格數據和人類知識的安全且一致性存取。
-\text 在FastMCP服務內部，嵌入的LLM-Based Semantic Optimization組執行語義增強演算法：
-
-\begin{enumerate}
-    \item 模組透過精確的Prompt Engineering，指示底層 LLM 學習原始規範中參數的潛在語義（例如，從名稱判斷用途），並生成多個語義相似且具代表性的參數值集合（RTSet）。
-    \item 緊接著，LLM自動掃描原始OpenAPI規範，將生成的para-value鍵值對從 RTSet 替換或補充到對應參數的enum字段中。此步驟旨在確保Test Coder Agent能夠存取到具備業務語義的有效輸入值，而非隨機生成的無效數據。
-\end{enumerate}
-
-\text 經過FastMCP服務處理後，最終的輸出結果（包括分類結果、語義增強後的規格，以及Manual Document中包含的人類預期結果）將被標準化封裝成核心上下文（Core Context）。此核心上下文作為A2A狀態資料結構的一部分，被注入到測試流程中。此機制確保了後續的Test Coder Agent在生成腳本時，能夠在語法和語義上都依據一個一致且強化過的測試依據，從而大幅提升測試腳本的準確率和有效性。
-
-\text 本研究建議利用LangChain程式庫作為FastMCP服務中的底層工具互動層。LangChain的Tool抽象機制用於將「OpenAPI語義增強」定義為一個可供Agent安全呼叫的服務。該Tool內部利用LangChain的LLM Chain執行所有Prompt Engineering和數據擴增邏輯。FastMCP服務在此充當上下文管理器，負責將LLM生成的高語義參數值安全地寫入到核心上下文中，確保Planner Agent透過MCP呼叫此服務時，能夠獲得上下文完整性的保證。
-
-\begin{table*}[htbp]
+\text 本研究之環境架構建立於多代理協作與狀態式工作流程控制之上。因此，本研究採取混合式架構，將不同技術元件放置於不同職責層級中，如圖 \ref{fig:environment_architecture} 所示：
+\begin{figure}[H]
     \centering
-    \caption{語義優化與上下文建立範例設計對照表} 
-    \label{tab:context_optimization}
-    \scriptsize % 字體縮小
-    \renewcommand{\arraystretch}{1.5} % 增加行距，讓沒格線的表格更好讀
-    
-    % 修改處：移除了直向分隔線 "|"
-    % 使用 p{寬度} 確保中文自動換行且不報錯
-    \begin{tabular}{p{2.5cm} p{6.5cm} p{6.5cm}}
-        \toprule % 頂部粗線
-        \textbf{Step} & \textbf{Content} & \textbf{Example} \\
-        \midrule % 中間分隔線
-        
-        % 第 1 列
-        輸入：原始規格 & 
-        OpenAPI 規範：id 參數的類型為 \texttt{string}，但無 \texttt{enum} 字段。 & 
-        缺乏語義，可能被 Fuzzer 隨機填入 "123" 或 "abc"，難以通過語義檢查。 \\
-        \addlinespace % 增加列之間的空隙
-        
-        % 第 2 列
-        輸入：Manual Document & 
-        預期結果："系統應接受格式為 U\_XXXXXX (X為數字) 的使用者 ID。" & 
-        提供了高語義的有效值格式。 \\
-        \addlinespace
-        
-        % 第 3 列
-        MCP 服務執行語義優化 & 
-        Planner Agent 呼叫 FastMCP 服務執行 LLM 數據擴增（類似 RESTLess）。 & 
-        透過 Prompt 告訴 LLM id 的語義應是 U\_XXXXXX 格式。LLM 生成 RTSet 範例：["U\_001234", "U\_987654", "U\_555555"]。 \\
-        \addlinespace
-        
-        % 第 4 列
-        生成語義增強規格 & 
-        FastMCP 服務將 RTSet 寫入規格的 \texttt{enum} 字段。 & 
-        新的 OpenAPI 規範：id 參數新增 \texttt{enum}:["U\_001234", "U\_987654", "U\_555555"]。 \\
-        \addlinespace
-        
-        % 第 5 列
-        上下文封裝 & 
-        Planner Agent 將增強後的規格和 Manual Document 封裝。 & 
-        A2A 狀態資料結構中包含：\{API\_SPEC\_ENHANCED:<增強後規格>, EXPECTED\_RESULT:"系統應接受...",...\}。 \\
-        
-        \bottomrule % 底部粗線
-    \end{tabular}
-\end{table*}
+    \includegraphics[width = 1.0\textwidth]{static-page/Env_Diagram.png}
+    \caption{Environment Architecture Diagram}
+    \label{fig:environment_architecture}
+\end{figure}
+\begin{enumerate}
+  \item LangChain：代理與工具整合主框架
+  \begin{itemize}
+    \item 在本研究中LangChain為主要應用框架，負責建立代理、呼叫大型語言模型、整合工具、管理結構化輸出解析，以及連接MCP的工具與上下文服務，使整體系統更容易維護與擴充。
+    \item 主要承擔整體代理應用的開發骨架，使不同代理能以一致方式呼叫LLM、上下文推理結構化，並將不同工作流程節點與LangGraph結合形成模組化任務節點。
+  \end{itemize}
+  \item AutoGen：協作推理層
+  \begin{itemize}
+    \item AutoGen為協作推理層，主要用於需要多角色討論、互評與共識形成的語意任務。主要的價值在於支援針對工作任務性的對話協作，使不同角色代理能從不同角度審查API規格、參數語意、請求-回應依賴關係與測試生成合理性。AutoGen的優勢在於能夠透過不同角色代理進行多角度推理，檢查參數限制、規格與手動文件之間是否存在衝突。
+    \item AutoGen原始研究指出，多代理對話可支援代理之間的協作、工具使用與任務分工，適合處理需要反覆討論與審查的LLM應用任務 \cite{Wu2023AutoGen}。
+    \item 然而，不必多方討論的工作流程則並不適合AutoGen負責，例如HTTP執行或整體流程控制等確定性任務，以避免代理對話產生不必要的延伸。
+  \end{itemize}
+  \item LangGraph：工作流程控制層
+  \begin{itemize}
+    \item LangGraph以狀態式的工作流程控制管理整體測試流程的節點順序、條件分支、狀態保存、重試控制與終止條件。RESTful API測試並非單次請求即可完成，而是包含規格解析、測試策略制定、測試案例生成、請求實體化、HTTP執行、結果分析與報告輸出等多階段流程。這些階段需要明確的執行順序與狀態轉移，因此必須由確定性的流程引擎負責控制，而不應完全依賴代理對話自行推進。
+    \item 主要任務包括定義各測試節點的執行順序、保存每一階段產生的中間狀態、限制多代理推理僅在指定節點內執行及確保整體流程具備可追蹤與可重播能力。換言之，LangGraph是整體系統的流程骨架，而不是語意推理核心。此設計呼應既有Agentic AI架構研究中對於流程協調、形式化狀態與可驗證工作流的重視 \cite{Borghoff2025Beyond}\cite{Bandi2025Rise}。
+  \end{itemize}
+  \item Model Context Protocol（MCP）：工具與上下文垂直存取層
+  \begin{itemize}
+    \item 標準化工具與上下文的垂直存取傳輸媒介以MCP協定，測試模組開放企業對接只需指定端點即可。對於RESTful API測試而言，代理在不同階段需要存取OpenAPI規格、系統分析文件規則、語意種子值、資源候選值、歷史執行紀錄與測試報告資料。若這些資訊直接散落於各代理對話中，將容易造成上下文不一致與資料遺失。因此，本研究透過MCP概念將外部工具、資料與上下文包裝為一致的服務介面。
+    \item MCP可支援的工具存取包括查詢指定端點的OpenAPI數據、取得指定規格、取得候選參數值、查詢資源庫、讀取執行紀錄，以及彙整測試報告所需資料。MCP相關研究指出，模型上下文協定的核心價值在於提供模型與外部工具、資料來源及上下文之間的標準化連接方式，但同時也需要注意資料權限、工具安全與上下文一致性問題 \cite{Hou2025MCP}\cite{Ehtesham2025SurveyMCPACPA2AANP}。\cite{Radeva2024Web}\cite{Brodimas2025Intent}此設計使代理不需直接管理所有資料來源，因此本研究設計主要是透過統一的上下文存取機制取得必要資訊，而非代理間自由溝通機制。
+  \end{itemize}
+  \item Agent-to-Agent Protocol（A2A）：代理間水平任務交接層
+  \begin{itemize}
+    \item A2A為代理間水平任務交接，用於描述代理之間的任務委派、分析結果傳遞與狀態交換。例如，規格分析階段透過AutoGen代理間對端點清單與欄位限制傳遞的討論與推論傳輸；案例生成代理可將測試案例交給測試生成代理；執行代理可將HTTP回應狀態與錯誤類型傳遞給決策代理；決策代理則可根據結構化結果判斷下一步行動。
+  \end{itemize}
+\end{enumerate}
 
-這個強化後的上下文隨後被注入到A2A流程中，供Test Coder Agent在階段二進行腳本生成時使用，確保生成的測試請求在語法和語義上都具有高通過率。
-
-\section{腳本生成與執行方法設計}
-\text 此階段的設計依託於多代理系統的結構化任務委派能力，並融合了參照RESTLess框架的混合語義優化策略，旨在生成具備高效率和高覆蓋率的黑箱測試案例。
-\text 將第一階段建構的語義強化上下文（MCP Context）轉化為可執行的測試序列的關鍵環節。主要奠基於A2A協議的水平協作特性，以及LLM驅動的語義優化，以突破傳統測試工具在處理RESTful API間複雜操作依賴和長序列生成上的技術瓶頸。
-
-\subsection{測試腳本生成}
-\text 流程始於Planner Agent透過A2A協定（由Autogen框架支持）啟動任務委託模式，將測試生成的任務與完整的A2A狀態資料（包含來自MCP服務的高語義化上下文）傳遞給Test Coder Agent。
-\text A2A協定在此提供了標準化的訊息傳遞框架，確保了任務目標、上下文資訊和依賴圖（ODG）要求的清晰、無損傳遞，為腳本生成提供了穩定的輸入依據。
-
-\text Test Coder Agent的生成是基於RESTLess的權重參數渲染順序優化策略 (Weight-Based Render Order Optimization)，此策略旨在平衡測試序列的有效性（Validity）與多樣性（Diversity）。該策略首先根據API規範，將參數區分為高權重參數（例如Required必填欄位）和低權重參數（例如Non-required可選欄位）。高權重參數被視為確保請求序列符合語法與業務邏輯、能夠通過雲端閘道檢查的關鍵要素。優先使用高權重參數和階段一語義增強後的RTSet資料進行渲染，以確保生成的初始測試序列$S_1$具備高成功率。同時，Agent必須嚴格遵循操作依賴圖（ODG）的順序要求，確保前置操作的輸出（例如Session Token或ID）被正確擷取並注入為後續操作的輸入。在完成有效序列生成後，Test Coder Agent根據可靈活調整的機率$\omega$（例如預設值$\omega=80\%$），決定是否將低權重參數納入測試序列。此機率抽樣機制有效地擴展了測試案例的多樣性，增加了發現潛在邊緣錯誤（Edge Cases）的可能性，同時保持了對語義有效性的高度關注。
-
-\subsection{腳本執行與黑箱測試驗證}
-\text 生成的測試腳本（例如Python腳本）隨後被傳遞給Executor Agent執行。Executor Agent執行針對測試目標RESTful API的黑箱測試。其操作不依賴服務的內部原始碼，而是完全根據語義增強後的OpenAPI規範和Manual Document中的預期輸出來驗證系統的外部行為。
-\text Executor Agent負責實際的HTTP請求發送，並準確記錄所有執行細節和原始結果（Raw Result），包括但不限於HTTP狀態碼（2XX, 4XX, 5XX）和回應主體。這些原始結果隨後透過A2A協定傳遞給下一階段的Analyzer Agent，作為結果分析與自校準的基礎輸入。
-
-\text 透過上述設計，本階段確保了測試腳本不僅具備LLM的靈活性，更結合了工程的嚴謹性，為後續的自動化驗證與CI/CD流程奠定了高效且可靠的基礎。
-
-\section{結果分析與自校準驗證機制設計}
-\text 為應對整個自動化測試流程中驗證（Verification）回復（Recovery）錯誤復原（Error Recovery）結果分析與自校準驗證機制，此階段結合了A2A協定的訊息交換（Message Exchange）MCP Context所提供的上下文一致性，以實現高度自主的測試流程。
-\text 本研究於此階段承繼Executor Agent的原始執行結果（即測試執行過程中產生的Artifacts透過A2A協定回傳給Analyzer Agent，包括 HTTP 狀態碼）判斷測試成功或失敗，決定是否啟動Re-loop機制。
-
-\text 當Analyzer Agent判斷測試失敗後，它會將結構化（例如JSON或Topic-tagged tokens）的失敗原因和當前狀態透過A2A協定回饋給Planner Agent。這種回饋方式類似於ReAct 框架中的反思（Reflection）過程，確保錯誤診斷信息（例如，操作間依賴性錯誤或服務端邏輯錯誤）能夠被清晰地傳遞。
-\text 在Re-loop過程中，MCP協議扮演了關鍵的上下文連續性角色。所有關鍵的當前狀態資訊（例如，導致失敗的參數序列、錯誤的執行堆疊）必須被安全且一致地維持在MCP Context中。這確保了在多步驟操作中，Planner Agent和Test Coder Agent能夠以一致的視角存取所需的診斷資訊，避免狀態遺失。
-\text Planner Agent收到結構化回饋後，啟動Re-loop流程，並將修復任務重新委派給Test Coder Agent。此循環（規劃-執行-分析-修復）賦予了系統強大的強韌性，使其能夠在無需人工干預的情況下，透過反覆迭代優化其行動和計畫。
-
-\begin{table*}[htbp]
+\text 整合相關技術元件之職責如表 \ref{tab:environment_soc} 所示：
+\begin{table}[H]
     \centering
-    \caption{範例應對表：處理參數依賴性錯誤} 
-    \label{tab:dependency_error_handling}
-    \scriptsize 
-    \renewcommand{\arraystretch}{1.5} 
-    
-    % 去掉 "|"，使用 p{寬度} 控制排版
-    \begin{tabular}{p{2.5cm} p{6.5cm} p{6.5cm}}
+    \caption{環境架構之技術元件職責分離}
+    \label{tab:environment_soc}
+    \scriptsize
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabular}{p{3cm} p{4cm} p{7.5cm}}
         \toprule
-        \textbf{Step} & \textbf{Content} & \textbf{Error \& Repair} \\
+        \textbf{技術元件} & \textbf{架構定位} & \textbf{主要職責} \\
         \midrule
-        
-        Executor 執行 & 
-        Executor Agent 執行腳本，但步驟（2）失敗，返回 404 Not Found。 & 
-        A2A 傳輸結果：Executor Agent 將 404 狀態碼和堆疊追蹤作為 Artifacts 傳輸給 Analyzer Agent。 \\
-        \addlinespace
-        
-        Analyzer 分析 & 
-        Analyzer Agent 透過 LLM 檢查 Manual Document，發現預期結果應為 200 OK。分析結果的 404 狀態碼，與步驟（1）的輸出 user\_id 不一致，判斷測試失敗。 & 
-        MCP Context 標記：Analyzer Agent 將失敗原因標記為：ERROR\_TYPE:Inter-operation Dependency Failure，並將此標記和當前 user\_id 的值維持在 MCP Context 中。 \\
-        \addlinespace
-        
-        Planner 重新規劃 & 
-        Planner Agent 接收到結構化失敗訊息和上下文後，啟動 Re-loop，並重新委派 Test Coder Agent。 & 
-        Test Coder Agent 修復：代理意識到 user\_id 可能在步驟（1）中未被正確提取或格式化。它存取 MCP Context 中的資訊，修改腳本以確保 user\_id 被正確解析和注入到步驟（2）的 URL 中，直到測試成功。 \\
-        \addlinespace
-        
-        生成語義增強規格 & 
-        FastMCP 服務將 RTSet 寫入規格的 \texttt{enum} 字段。 & 
-        新的 OpenAPI 規範：id 參數新增 \texttt{enum}:["U\_001234", "U\_987654", "U\_555555"]。 \\
-        \addlinespace
-        
-        上下文封裝 & 
-        Planner Agent 將增強後的規格和 Manual Document 封裝。 & 
-        A2A 狀態資料結構中包含：\{API\_SPEC\_ENHANCED:<增強後規格>, EXPECTED\_RESULT:"系統應接受...",...\}。 \\
+        LangChain & 代理與工具整合主框架 & 建立代理、呼叫 LLM、整合工具、解析結構化輸出，並連接MCP風格工具與上下文服務。 \\
+        AutoGen & 協作推理層 & 在指定節點中進行多代理語意分析、依賴推斷、衝突檢查與測試案例審查。 \\
+        LangGraph & 狀態式工作流程控制層 & 控制節點順序、狀態保存、條件分支、重試、終止條件與實驗重播。 \\
+        MCP & 工具與上下文垂直存取層 & 存取OpenAPI數據、取得指定規格、取得候選參數值、查詢資源庫、讀取執行紀錄。 \\
+        A2A & 代理間水平任務交接層 & 支援代理之間的任務委派、狀態交換與結構化分析結果傳遞。 \\
         \bottomrule
     \end{tabular}
-\end{table*}
+\end{table}
 
-\section{CI/CD Pipeline GitOps自動化整合設計流程}
-\text 本研究階段旨在將測試流程的成功結果自動轉化為持續整合/持續交付（CI/CD）管道中的具體部署動作，關鍵在於實現分散式雙主機架構下的跨協議互操作性，從而消除從測試到部署的人工干預間隙，實現從測試到部署的自動化銜接。本階段的設計核心是依賴A2A Protocol來執行遠程、結構化的任務委派，特別適用於分散式且可擴展的代理生態系統。
+\text 換言之，LangChain負責讓代理能「使用模型與工具」，LangGraph負責讓流程能「依照狀態圖執行」，AutoGen則負責讓特定節點能「進行多角色協作推理」。此種分工可避免將模型推理、工具調用與流程控制混在同一層處理，也能提升後續系統維護與擴充的可行性。既有研究亦指出，LLM應用框架若將語意理解與流程協調混合在同一層，可能導致額外的協調成本與可驗證性問題，因此將語意處理與流程控制分離是多代理系統設計中的重要方向 \cite{Borghoff2025Beyond}\cite{Bandi2025Rise}。因此，本研究將AutoGen限定於LangGraph指定節點中使用，並要求其輸出必須轉換為結構化格式，例如JSON、表格化欄位或明確的狀態物件，供後續節點使用。
+\text 而MCP與A2A在本研究中具有明確差異，MCP處理的是代理對工具與資料的垂直存取，A2A處理的是代理與代理之間的水平協作。前者確保上下文一致性，後者確保任務交接清楚。透過兩者分工，本研究能同時支援外部工具整合與多代理協作，並降低單一代理集中處理所有任務所造成的複雜度。既有研究亦指出，A2A、MCP與其他代理通訊協定各自處理不同層次的互通問題，若能明確區分資料存取與代理協作，可提升多代理系統的可擴展性與互通性。 \cite{Ehtesham2025SurveyMCPACPA2AANP}\cite{Tupe2024MultiAgentCollaboration}\cite{Wang2025Survey}\cite{Du2026TaskON}
+\text 為使代理人之間能夠共享推理結果，本研究透過A2A概念建立代理間資訊交換機制。在討論過程中，每個代理皆可接收前一代理所產生之分析結果，並於其基礎上進行後續推理。其互動流程可表示為：
+\begin{equation}
+Agent_{QA}
+\leftrightarrow
+Agent_{Developer}
+\leftrightarrow
+Agent_{Moderator}
+\end{equation}
 
-\subsection{A2A 跨主機任務委派與職責}
-\text 本框架利用雙主機設計實現責任隔離，AutoGen Host一旦測試成功（通過階段三的自校準驗證），Executor Agent即充當 Client Agent 的角色負責分析意圖並構建一個結構化的Task物件，將其發送出去。位於GitOps Host上的GitOps Agent扮演Remote Agent(Server)的角色。Remote Agent必須發布Agent Card來宣告其可用 Skills（例如Git操作能力），並執行Client Agent委派的任務。
-\text 這種跨主機的A2A實施，展示了協議在互通性方面的優勢。A2A協定作為點對點任務委派的標準化介面，確保Client Agent能夠安全且結構化地與位於不同網路邊界上的GitOps Agent協作。此時，A2A請求扮演了執行訊號（Actuation Signal）的角色，將測試成功的認知結果（來自AutoGen Host）轉譯為對外部Git Repository的實際影響（來自 GitOps Host）。
+\text 於測試生成階段則進一步形成：
 
-\subsection{安全性考量與GitOps自動化銜接}
-\text 本階段的實施必須同時滿足自動化銜接與高安全性的要求。所有核心任務通訊均建議採用JSON-RPC或類似的結構化格式，以確保方法調用和參數傳遞的標準化。Client Agent在發送請求時，必須將測試階段產生的關鍵Artifacts（例如測試結果、成功狀態）作為A2A訊息的一部分傳輸。這些Artifacts用於創建可追溯性（Traceability）日誌，並作為GitOps Agent執行高權限操作的必要前置條件。
-\text 在分散式環境下，對高權限的Git操作進行存取控制至關重要。GitOps Agent 必須實施嚴格的驗證機制來確認Client Agent的身份和訊息完整性（例如利用JWS（JSON Web Signatures）驗證訊息）。此機制確保了只有經過驗證的自動化流程才能觸發敏感的Git操作。
-\text GitOps Agent接收A2A結構化請求後，將任務（例如創建Pull Request或合併分支）轉化為實際的Git操作。此操作是Execution and Actuation模組的核心，成功執行後，GitOps Agent必須將操作結果（例如Pull Request連結、新的Commit ID）作為Artifacts，透過A2A協議回傳給Client Agent，供最終的報告生成階段（階段五）使用。
+\begin{equation}
+Agent_{Author}
+\leftrightarrow
+Agent_{Reviewer}
+\rightarrow
+Agent_{Decision}
+\end{equation}
 
-\section{最終報告產出設計}
-\text 本研究方法論的第五階段為報告生成與結案（Reporting & Closure），此階段作為整個複雜多代理流程的最終交付環節，旨在將所有測試活動、協作決策和最終結果轉化為一份完整、結構化且具備可追溯性的最終測試報告。此階段的設計核心在於解決多代理長時間協作下常見的上下文破碎化問題，並確保系統具備完全的透明度（Transparency）與問責性（Accountability）。本階段的理論設計奠基於MCP的核心能力，即維持上下文一致性和安全整合工具服務。
+\text 透過此種鏈式協作方式，可使代理人之間逐步累積上下文知識，而非各自獨立推理。多代理協作模組之執行流程如演算法\ref{alg:multi_agent_workflow}所示。
 
-\text Analyzer Agent或Planner Agent（作為Client Agent）將再次呼叫FastMCP服務（由LangChain程式庫支持的工具互動層），啟動Reporter Agent。MCP協定在此處提供了上下文感知層，其核心作用是安全且結構化地存取整個A2A流程中累積的上下文數據和執行結果。
-\text MCP 在此階段的關鍵任務是確保所有工具和代理在整個複雜流程中上下文的一致性。Reporter Agent透過MCP服務，能夠存取並整合所有 Agent（包括 Planner, Coder, Executor, GitOps Agent）的日誌、A2A協定中定義的Artifacts（執行結果）、Manual Document的預期值以及階段一的前置處理分類結果。這種全面性的數據整合機制，避免了傳統系統中的數據孤島問題，確保最終報告基於連貫且完整的操作歷史。
-\text 最終生成的報告必須是完整且結構化的。結構化報告是LLM驅動的Agentic系統中可追溯性的關鍵要素。這使得報告不僅能夠呈現結果，還能提供操作洞察和合規性文件，涵蓋LLM的互動、決策依據和協作流程。
+\begin{algorithm}[htbp]
+\caption{多代理協作流程}
+\label{alg:multi_agent_workflow}
+\begin{algorithmic}[1]
+\REQUIRE OpenAPI Specification, Manual Document, Gold Path, MCP Context
+\ENSURE Finalized Specification
+\STATE Initialize Agent Set
+\STATE QA Agent analyzes testing requirements
+\STATE Developer Agent analyzes dependency constraints
+\STATE Moderator Agent integrates discussion results
+\STATE Generate Specification Discussion Result
+\STATE Generate Finalized Specification
+\RETURN Finalized Specification
+\end{algorithmic}
+\end{algorithm}
 
-\text 本階段的實施將Reporter Agent作為一個專門的Worker Agent，利用LLM的語言理解和生成能力來彙整複雜數據並生成結構化輸出：
-\text FastMCP作為資料匯集與服務層FastMCP服務應被設計為一個資料匯集層（Data Aggregation Layer），其核心功能是從長短期記憶（STM/LTM）單元中檢索整個協作流程的數據。Reporter Agent透過LangChain抽象化，調用LLM來執行報告生成任務。報告的內容以結構化格式（例如JSON或YAML）作為基礎，然後再轉譯為人類可讀的Markdown或HTML格式。結構化測試報告內容最終報告應包括以下關鍵結構化部分：
+\text 多代理協作模組位於整體工作流程之中介層，其主要負責連接規格解析模組與測試生成模組。因此，多代理協作模組實際扮演語意推理中心（Semantic Reasoning Hub）之角色。其主要功能並非直接產生測試案例，而是在測試生成之前完成規格理解、知識整合與約束推理，使後續模組能建立於較完整之API語意模型之上。
+
+\subsection{Agent角色與責任分工}
+
+\text 本研究之代理設計採取以AutoGen的框架「群組式協作代理」與「單一決策代理」並行的方式。群組式協作代理主要用於需要多角度審查、語意推理與共識形成的任務；單一決策代理則用於根據HTTP執行狀態產生明確的工作流程決策。此設計的核心理由是：規格理解與測試生成需要多角色討論，但HTTP狀態導向的工作流程決策必須維持一致、可重播且可評估，因此不宜讓多代理自由發散。
+\text 圖 \ref{fig:agent_architecture} 更清楚說明代理人在整體測試流程中的配置位置與協作關係，整理了本研究由輸入、規格解析、測試生成、API執行至報告輸出之代理分布方式。相較於前述環境架構圖著重技術元件分層，此圖進一步強調代理角色如何嵌入各工作階段，以及哪些階段採用多代理協作、哪些階段採用單一代理或確定性執行模組。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth]{static-page/agent_architecture.png}
+    \caption{本研究代理架構與流程階段配置圖}
+    \label{fig:agent_architecture}
+\end{figure}
+
+\text 由圖 \ref{fig:agent_architecture} 可知，本研究之代理協作主要集中於OpenAPI規格解析與測試生成兩個階段。前者透過多代理討論形成較完整之規格語意、依賴關係與限制條件；後者則利用代理協作完成測試案例撰寫、審查與請求具體化。相對地，API執行階段以確定性執行模組為主，避免代理對話直接介入HTTP執行流程；執行完成後，再由決策代理根據回應結果、錯誤類型與工作流程狀態決定後續行動，最後輸出結構化測試報告。
+\text AutoGen在本研究中負責協作代理。規格語意理解層為品質代理、開發代理與協調代理，主要用於規格語意推理、約束分析與衝突檢查。品質代理負責從測試與驗證角度檢查API規格是否足以產生測試案例；開發代理負責從後端實作與資料流程角度推斷可能的請求限制、資料依賴與業務規則；協調代理則負責整理前兩者之意見，形成一致的語意限制、依賴候選項目與衝突清單。AutoGen原始研究指出，多代理對話可支援角色分工、工具使用與協作式問題解決，因此適合處理此類需要審查與共識形成的任務\cite{Wu2023AutoGen}。
+\text 測試程式生成層為測試撰寫代理與測試審查代理，主要用於測試案例轉換與測試程式審查。測試撰寫代理負責根據語意限制、依賴候選項目與輸入種子值產生測試案例、請求序列與測試程式草稿；測試審查代理則負責檢查請求參數是否完整、路徑參數是否正確替換、請求主體是否符合格式、檢查點是否合理，以及測試程式是否具備可執行性。既有大型語言模型軟體測試研究指出，模型生成測試程式時仍可能出現不可執行、缺少上下文或檢查點不完整等問題，因此透過審查代理形成第二層驗證，可提升測試生成品質與可執行性\cite{Wang2024Software}\cite{Anonymous2023LLMGenerators}。
+\text 決策代理在本研究中為單一代理，是專門處理HTTP狀態導向的工作流程決策，其輸入為API執行狀態、錯誤類型、端點、請求方法、授權狀態、資源可用性、重試次數、請求主體複雜度、前置檢查結果、環境訊號與前一個行動；其輸出為下一步工作流程行動。此設計參考ARAT-RL將REST API測試中的操作、參數與資料來源選擇視為強化學習探索問題，並根據API回應更新探索優先權的概念\cite{Kim2023Adaptive}。本研究進一步將此思想延伸至工作流程層級，使決策代理可針對不同HTTP狀態選擇下一個測試流程行動。
+
+\begin{table}[H]
+    \centering
+    \caption{本研究代理角色與責任分工}
+    \label{tab:agent_roles}
+    \scriptsize
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{1.3cm} >{\raggedright\arraybackslash}p{1.8cm} >{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{框架} & \textbf{功能階層} & \textbf{代理角色} & \textbf{主要任務} & \textbf{主要輸出} \\
+        \midrule
+        AutoGen & 規格語意理解層 & 品質代理 & 從測試觀點檢查規格完整性、測試目標與檢查點需求 & 測試需求、風險清單、檢查點建議 \\
+        AutoGen & 規格語意理解層 & 開發代理 & 從後端實作與資料流程觀點推斷欄位限制、資源依賴與可能錯誤來源 & 語意限制、資料依賴、資源需求 \\
+        AutoGen & 規格語意理解層 & 協調代理 & 彙整品質代理與開發代理意見，消除衝突並形成共識 & 衝突清單、依賴候選項目、語意約束摘要 \\
+        AutoGen & 測試程式生成層 & 測試撰寫代理 & 將測試案例轉換為請求序列與測試程式草稿 & 測試案例、請求序列、測試腳本草稿 \\
+        AutoGen & 測試程式生成層 & 測試審查代理 & 檢查測試程式、請求實體化與檢查點是否可執行且符合語意 & 修正建議、可執行性檢查、測試審查結果 \\
+        LangChain單一代理 & 分析與工作流程決策層 & 決策代理 & 根據HTTP執行狀態與歷史狀態選擇下一步工作流程行動 & 工作流程行動、決策依據、信心指數、獎勵佔位 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\subsection{系統架構之五個功能模組}
+
+\text 本研究將RESTful API自動化測試系統劃分為五個功能層級，分別為規格語意理解層、測試案例生成層、測試程式生成層、API執行層，以及分析與工作流程決策層。此五層架構的目的在於將API測試從「規格輸入」、「測試執行」到「結果分析」的流程清楚分離，使每一層皆具有明確的輸入、輸出與責任範圍。
 \begin{enumerate}
-    \item 測試元數據（Metadata）： 測試ID、OpenAPI規格版本、測試目標（URL）。
-    \item 上下文基礎（Context Foundation）： 階段一輸出的語義增強後規格的摘要（例如，RTSet中使用的關鍵參數值，以驗證測試輸入的品質）。
-    \item 執行摘要（Execution Summary）： 總測試序列數、成功/失敗次數、總執行時間（Task Completion Time, TCT）。
-    \item 失敗分析與自校準追溯（Failure Analysis \& Self-Correction Trace）： 對階段三中所有失敗案例的詳細追溯，包括Analyzer Agent判定的失敗原因（例如，Inter-operation Dependency Failure）、啟動的Re-loop次數，以及最終修復成功的代碼片段。
-    \item GitOps行動記錄：記錄階段四中GitOps Agent執行的具體操作（例如，Merge Branch或Create Pull Request的連結），以確保測試流程與CI/CD流程的可追溯性銜接。
+  \item 第一層：規格語意理解層（Specification Parsing Layer）
+  \begin{itemize}
+    \item 規格語意理解層負責接收OpenAPI規格、系統分析文件與歷史執行紀錄，並萃取端點、HTTP方式、路徑參數、請求參數、請求主體格式、回應格式、身份驗證要求與狀態碼定義等資訊。此層亦會分析每個欄位名稱、說明、類型與規格，以推斷可能的語意約束。
+    \item 此層的設計基礎來自OpenAPI格式的REST API testing的相關研究。RESTTestGen、RESTler與其他規格形式的REST API測試方法皆顯示，OpenAPI規格可作為自動化測試產生的重要輸入 \cite{Viglianisi2020RESTTESTGEN}\cite{Corradini2022RestTestGen}\cite{Atlidakis2019RESTler}。研究證明將需求文件與源碼函數嵌入到統一的特徵空間，解決「詞彙不匹配」問題，準確建立追蹤連結。\cite{Dai2023ConstructingTraceability}
+    \item 然而，OpenAPI規格本身通常不足以完整描述商業邏輯與依賴關係，因此本研究在此層加入LLM分析提取其語意與規格串接，以補足規格語意不足的問題。
+  \end{itemize}
+  \item 第二層：測試案例生成層（Test Case Generation Layer）
+  \begin{itemize}
+    \item 測試案例生成層負責根據規格語意理解層產生的端點參數、語意約束、規格形式與依賴關係，生成抽象測試案例與請求序列。此層不直接產生最終程式碼，而是先生成具商業邏輯且讓後續提高執行可達性的測試意圖，例如測試目標、測試資料、預期狀態、依賴來源與執行順序。
+    \item 另外，本研究在此層採用基於RESTLess輸入種子生成方式。RESTLess的研究指出，透過語意增強資料集與LLM生成具語意合理性的參數值，可改善傳統REST API模糊測試中大量無效請求的問題 \cite{Zheng2024RESTLess}。本研究參考其語意增強概念，根據參數名稱、格式、說明、類型與規格產生測試參數資料。此外，本研究亦參考KAT對依賴性API testing的設計，將請求-回應依賴實施納入測試案例生成流程 \cite{Nguyen2024KAT}。
+  \end{itemize}
+  \item 第三層：測試程式生成層（Test Code Generation Layer）
+  \begin{itemize}
+    \item 測試程式生成層負責將抽象測試案例轉換為可執行測試程式。此層包含請求具體化、測試腳本生成、建立檢查點、設置與解除邏輯安排等任務。大型語言模型可協助產生初步測試程式，但測試程式是否可執行仍取決於路徑參數替換、查詢字串的組合、JSON主體的建構、頁首的設定、身份驗證碼的注入與錯誤處理等工程細節。
+    \item 因此，本研究將測試案例生成與測試程式生成分開處理。測試案例生成層負責決定「要測什麼」，測試程式生成層負責決定「如何轉換成可執行請求」。此分離可避免LLM直接產生不可執行或缺乏上下文的測試程式，也有助於後續評估程式可執行率。既有LLM軟體測試研究亦指出，大型語言模型在測試生成上具有潛力，但仍需要工具、結構化流程與執行回饋來提升可執行性與可靠性 \cite{Wang2024Software}\cite{Anonymous2023LLMGenerators}。
+  \end{itemize}
+  \item 第四層：API 執行層（API Execution Layer）
+  \begin{itemize}
+    \item API執行層負責實際送出HTTP請求，並記錄每筆測試案例的執行結果。此層收集的資訊包含HTTP狀態碼、回應主體、標頭、回應時間、錯誤類型、超時、重試次數與環境訊號。此層採黑箱測試觀點，不依賴服務內部原始碼，而是根據API外部行為、規格描述與預期結果進行觀察。
+    \item API執行層的輸出不只是成功或失敗，而是後續分析與工作流程決策的重要輸入。LlamaRestTest的研究指出，伺服器回應可作為調整測試輸入與依賴規則的重要訊號 \cite{Kim2025LlamaRestTest}。本研究延伸此觀點，將 HTTP 執行結果視為下一步工作流程decision 的狀態來源，使測試流程不只停留在測試結果判斷，而能進一步支援狀態式分析。
+  \end{itemize}
+  \item 第五層：分析與工作流程決策層（Analysis and Workflow Decision Layer）
+  \begin{itemize}
+    \item 分析與工作流程決策層負責彙整API執行結果，判斷測試案例是否符合預期，並產生後續 工作流程行動。此層會根據 HTTP狀態碼、錯誤類型、端點、方式、驗證狀態、資源信號、請求主體複雜度、重試次數與執行歷史紀錄等資訊形成工作流程決策狀態。
+    \item 本研究的 工作流程決策策略 與其強化學習形式化設計將於後續章節補充。本章先保留方法位置，說明其在整體架構中的角色：工作流程決策策略不是取代測試案例生成器，也不是單純的錯誤分類器，而是位於API執行結果之後、報告輸出之前的工作流程決策模組。其目的在於使系統能根據執行狀態判斷下一步應繼續、重試、重新產生輸入、更新授權、標記環境異常或進入報告流程。此設計可將API測試中的動態執行狀態轉換為可觀測、可比較的工作流程決策活動，並為後續MDP與策略比較留下資料基礎。
+  \end{itemize}
 \end{enumerate}
 
-\text 這個階段的設計，確保了整個LLM代理測試流程具備持久性和問責性，因為每一個決策和結果都能夠在最終的結構化報告中找到清晰、一致的記錄。
-\text 整個雙協定整合的流程，從資料輸入到最終報告生成，就像是一個智慧化工廠：A2A協定是生產線上的工人之間傳遞指令和半成品（任務委派和執行結果），而MCP協定則像是中央管理系統，持續記錄所有工作步驟、使用的工具及最終的品質檢測數據，確保最終出廠的產品（測試報告）是完整且可驗證的。
-為實現上述目標，本研究提出之「雙協定混合架構框架」之架構圖，如下圖3.1所示。
-\begin{figure*}[htbp]
+\begin{table}[H]
     \centering
-    \includegraphics[width = 1.0\textwidth]{static-page/SystemArchitectureDiagram.png}
-    \caption{System Architecture Diagram}
-    \label{fig: image}
-\end{figure*}
+    \caption{自動化測試之五層功能架構}
+    \label{tab:five_layer_architecture}
+    \scriptsize
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{2.8cm}}
+        \toprule
+        \textbf{層級} & \textbf{主要輸入} & \textbf{主要輸出} & \textbf{核心方法} \\
+        \midrule
+        規格語意理解層 & OpenAPI 規格、系統分析文件、歷史執行紀錄 & 端點資料、語意約束、依賴關係 & LLM語意執行、提取規格形式 \\
+        測試案例生成層 & 語意約束、規格形式、依賴關係 & 具像化的測試案例、請求序列 & RESTLess式語義增強資料集、相依關係生成 \\
+        測試程式生成層 & 測試案例、請求序列、驗證設置 & 可執行的測試腳本、HTTP請求、檢查點 & 請求實體化、結構化測試腳本生成 \\
+        API執行層 & HTTP請求、測試腳本、API環境 & 狀態碼、回應主體、延遲時間、錯誤類型 & 黑箱HTTP執行 \\
+        分析與工作流程決策層 & 執行結果、預期行為、執行歷史紀錄 & 分析結果、工作流程決策狀態、工作流程行動 & 結果分析、工作流程決策策略 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-% \begin{table*}[htbp]
-%     \centering
-%     \caption{表格範例標題} \label{tab: complexity}
-%     \makebox[\linewidth][c]{
-%     \renewcommand\arraystretch{1.2}{
-%         \begin{tabular}{| l | c  c  c  c |}
-%         \hline
-%         Protocol & $P$ & $CS_1$ & $CS_2$ & $RG$ \\
-%         \hline
-%         MSSMul & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
-%         SC & $O(1)$, $O(1)$, N/A & $O(n-t)$, $O(n)$, $O(1)$ & $O(n-t)$, $O(n)$, N/A & $O(1)$, $O(n)$, $O(n)$ \\
-%         \hline 
-%         \end {tabular}
-%     }}
-% \end {table*}
+\subsection{工作流程節點設計架構}
+\text 本研究以工作流程引擎（Workflow Engine）作為整體系統執行核心，負責串接OpenAPI規格處理、多代理語意推理、測試案例生成、測試程式實體化、API執行、工作流程決策與報告產生等模組。此設計的主要目的在於將RESTful API自動化測試流程拆解為可管理、可追蹤且可重播的節點式流程，避免將規格解析、模型推理、HTTP執行與決策判斷混合於單一程序中，造成系統維護困難與實驗結果不可重現。本研究之工作流程引擎實作於 \texttt{workflow\_engine.py}，核心類別為 \texttt{WorkflowEngine}。該類別封裝LangGraph工作流程建立、節點註冊、邊線設定、條件分支、編譯與執行等功能。系統執行時，所有節點皆透過共用之 \texttt{WorkflowState} 傳遞資料，各節點僅處理自身所需輸入欄位，並將執行結果回寫至狀態物件中，供後續節點使用。
+\text 本研究採用LangGraph作為RESTful API測試工作流程編排框架（Workflow Orchestration Framework），建立具狀態管理能力之工作流程圖（Workflow Graph），將各功能模組封裝為獨立節點（Node），每個節點皆具有明確的輸入、處理邏輯與輸出狀態，並由LangGraph保存跨節點的中間資料，並透過共享工作流程狀態（Workflow State）進行資料交換。此設計使系統能夠保留完整執行軌跡，並支援後續決策分析、策略比較與結果回溯。相對地適合RESTful API測試流程，因為API測試通常包含多個相依階段，例如規格解析、語意分析、輸入生成、測試程式產生、HTTP執行與結果分析，各階段之間具有明確的資料依賴關係。
+\text 在實驗上，\texttt{WorkflowEngine} 透過 \texttt{StateGraph} 建立工作流程圖，並以 \texttt{WorkflowState} 作為狀態型別。其中，\texttt{create\_workflow()} 用於建立新的狀態圖；\texttt{add\_node()} 將功能模組註冊為工作流程節點；\texttt{add\_edge()} 定義節點之間的固定執行順序；\texttt{add\_conditional\_edge()} 則用於建立依據狀態結果決定之條件分支；\texttt{compile()} 將工作流程圖編譯為可執行物件；\texttt{invoke()} 則根據初始狀態啟動整體流程。本研究目前實作之主要工作流程節點如表\ref{tab:workflow_nodes_implementation}所示。這些節點並非僅為概念設計，而是對應至系統中實際可執行之節點函式。
 
-% \section{模型說明（小標）}
+\begin{enumerate}
+  \item 輸入收集與規格解析
+  \begin{itemize}
+    \item 收集OpenAPI規格、系統分析文件與既有執行紀錄。此節點會解析API端點、HTTP方式、參數、請求主體格式、回應格式、身份驗證要求與狀態碼定義。其輸出為標準化的API規格，作為後續語意推理與測試案例生成的基礎。
+  \end{itemize}
+  \item 語意推理與約束抽取
+  \begin{itemize}
+    \item 負責執行語意推理與約束抽取。此節點啟動AutoGen協作推理，由品質代理（QA Agent）、開發代理（Dev Agent）與協調代理（Moderator Agent）分別負責規格語意分析參數約束推斷與規格一致性檢查。此節點輸出語意限制（例如是否符合資料格式）、隱藏限制（例如跨欄位商業邏輯約束、前置條件約束等）、衝突清單（例如請求的資料與系統現有狀態牴觸）與依賴候選項目（例如兩個欄位之間存在的商業邏輯約束）。
+    \item 此節點的理論基礎來自LLM對自然語言規格與依賴關係的解析能力。KAT顯示LLM可從OpenAPI規格中辨識操作依賴與參數依賴 \cite{Nguyen2024KAT}；RESTLess與LlamaRestTest則顯示LLM可產生較具語意合理性的測試輸入，並利用回應資訊改善輸入規則 \cite{Zheng2024RESTLess}\cite{Kim2025LlamaRestTest}。
+  \end{itemize}
+  \item 測試案例生成
+  \begin{itemize}
+    \item 根據語意限制、規格形式、依賴候選項目與關鍵參數生成測試案例。此節點會先形成抽象測試案例，再依據端點依賴與請求-回應關係產生請求序列。此階段重點在於讓測試案例不只符合OpenAPI格式，也盡可能符合API的商業邏輯的語意與操作順序。
+  \end{itemize}
+  \item 測試程式與請求實體化
+  \begin{itemize}
+    \item 將測試案例轉換為可執行測試程式與HTTP請求。此節點會完成路徑參數替換、查詢參數產出、請求主體建構、請求標頭設定、身分驗證注入與測試驗證點生成。此節點可透過AutoGen讓測試生成代理（Test Author Agent）與測試審查代理（Test Reviewer Agent）共同處理，並由LangChain負責工具調用與結構化輸出解析。
+    \item 參考RESTLess所提出之語義增強概念，作為測試輸入生成策略，利用大型語言模型理解欄位語義與產生合理參數值的思想。根據OpenAPI規格的資料，以及規格文件中抽取出的欄位規則，產生較符合API語境的候選測試資料，將抽象測試案例轉換為可執行之HTTP請求。
+  \end{itemize}
+  \item API執行與回應收集
+  \begin{itemize}
+    \item 實際執行HTTP請求，並記錄API執行結果。此節點輸出狀態碼、回應主體、回應標頭、延遲時間、錯誤類型、重試次數與執行軌跡。此節點直接由HTTP執行器與LangGraph工作流程控制，以確保執行結果可追蹤且可重播。
+  \end{itemize}
+  \item 結果分析與工作流程決策
+  \begin{itemize}
+    \item 接收HTTP執行結果後，分析與工作流程決策節點首先將執行上下文轉換為結構化決策狀態，涵蓋HTTP狀態碼、語意錯誤類型、資源依賴狀態、授權狀態與重試歷史等訊號。決策代理依據此狀態，從標準化行動空間中選擇下一步工作流程行動，包括重試（retry）、更新授權（refresh\_token）、解析資源（resolve\_resource）、重新產生資料（regenerate\_data）或進入報告流程（report）。
+    \item 此決策層之設計目的不在於重新生成整條測試流程，而在於對既有執行結果進行後執行行動選擇（post-execution action selection），使測試流程得以在部分失敗情境下持續推進，而非於首次非2XX回應時即終止。
+    \item 當決策代理選擇恢復型行動時，系統會進入工作流程恢復執行層，依據行動類型從資源池（resource pool）、manual binding pool 或執行期訊號中取得補充資訊，並重新執行對應請求。恢復執行結果將再次進入決策節點，形成可觀測之閉迴路。
+    \item 本研究於此層比較兩種決策策略：rule-based 策略依預定規則映射狀態至行動，作為可解釋之基準；Offline-Q 策略則依離線學習所得之 Q 值估計選擇行動，作為學習型決策之可行性探索。兩者共用相同之狀態定義與行動空間，差異僅在於行動選擇的決策機制。
+  \end{itemize}
+  \item 報告生成與指標產出
+  \begin{itemize}
+    \item 最終產出測試報告，報告內容包含測試摘要、API執行結果、主要失敗類型、工作流程決策摘要與後續建議。報告生成階段會透過MCP串接工具存取前述節點累積的產出，並由LLM整理為結構化報告。此設計可提升測試流程的可追溯性，使最終報告不僅呈現成功或失敗，也能呈現決策依據與流程紀錄。
+  \end{itemize}
+\end{enumerate}
 
-% 說明說明說明說明，說明說明說明說明說明說明說明說明說明說明說明說明，說明說明說明說明說明說明說明說明。
+\text 此設計使系統能將多代理推理限制在指定節點中執行，同時保留整體流程决定性的實施。綜合五個階層及工作節點的架構如圖 \ref{fig:workflow_layer_architecture} 所示：
+\begin{figure}[H]
+    \centering
+    \includegraphics[width = 1.0\textwidth]{static-page/Workflow_Diagram.png}
+    \caption{Workflow \& Layer Architecture Diagram}
+    \label{fig:workflow_layer_architecture}
+\end{figure}
 
-% \begin{figure*}[htbp]
-%     \centering
-%     \includegraphics[width = 0.5\textwidth]{image.jpeg}
-%     \caption{Cool train station}
-%     \label{fig: image}
-% \end{figure*}
+\begin{table}[H]
+    \centering
+    \caption{工作流程引擎主要節點}
+    \label{tab:workflow_nodes_implementation}
+    \tiny
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.2cm} >{\raggedright\arraybackslash}p{4.0cm} >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{節點名稱} & \textbf{主要目的} & \textbf{主要輸出} \\
+        \midrule
+        \path{mcp_context_bootstrap} & 載入任務、Gold Path、Manual Rule與規格上下文 & \path{source_task, gold_path, manual_rule, mcp_context_bundle} \\
+        \path{input_spec_parse} & 解析OpenAPI規格並整合人工文件規則 & \path{openapi_spec, endpoints, manual_doc_rules, reconciled_spec} \\
+        \path{semantic_constraint_reasoning} & 進行規格語意討論、manual parse與evaluator rule產生 & \path{spec_discussion_result, manual_parse, evaluator_rule} \\
+        \path{seeded_input_generation} & 根據manual parse與規格內容產生seeded input資料 & \path{seeded_input_dataset} \\
+        \path{v2_seeded_execution} & 執行seeded input請求並解析跨步驟綁定 & \path{v2_test_cases, results, metrics} \\
+        \path{test_case_generation} & 產生抽象測試案例與測試策略上下文 & \path{test_cases, test_case_summary, candidate_parameter_context} \\
+        \path{test_code_materialization} & 將抽象測試案例轉換為可執行pytest程式碼 & \path{test_code, test_code_path, code_review, a2a_trace} \\
+        \path{api_execution} & 執行測試程式並蒐集HTTP結果與reward breakdown & \path{test_results, test_metrics, execution_context, reward_breakdowns} \\
+        \path{analysis_workflow_decision} & 根據執行結果產生工作流程決策 & \path{decision, decision_details, llm_telemetry_summary} \\
+        \path{report_generation} & 彙整測試結果、版本比較與策略分析報告 & \path{report, version_reports, version_comparison_report} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
+% \text 以JSON格式紀錄API執行後獲得狀態的格式表示如下：
+% \begin{verbatim}
+% {
+%   "test_case_id": "LIVE_TC_0011",
+%   "status": "passed",
+%   "http_details": {
+%     "method": "POST",
+%     "path": "/api/{assetName}/{features}",
+%     "url": "https://example.com/api/{assetName}/{features}",
+%     "status_code": 200,
+%     "headers": {
+%       "server": "nginx",
+%       "date": "dateTime",
+%       "content-type": "application/json; charset=utf-8",
+%       "transfer-encoding": "chunked",
+%       "connection": "keep-alive"
+%     },
+%     "body": "{sting}",
+%     "encoding": "utf-8",
+%     "response_time": {decimal}
+%   },
+%   "auth_details": {
+%     "type": "jwt",
+%     "token": "{string}.{string}.{string}"
+%   },
+%   "retry_details": {
+%     "attempts": 1,
+%     "backoff_strategy": "fixed",
+%     "total_time":  {decimal},
+%     "policy": "none",
+%     "reason": null,
+%     "semantic_fallback_applied": false
+%   },
+%   "timeout": {int},
+%   "error_message": null,
+%   "contract_issues": [],
+%   "api_error_type": null,
+%   "stack_trace": null,
+%   "timestamp": "dateTime"
+% }
+% \end{verbatim}
+
+\text 工作流程狀態（Workflow State）是本研究系統中各節點交換資料的核心資料結構。每一個節點執行時，皆會從目前狀態中讀取所需欄位，完成任務後再將產生之資料寫回狀態中。此設計使整體流程具有狀態可追蹤性，並能保留每一階段產生之中間結果。\texttt{WorkflowEngine} 並不要求各節點直接互相呼叫，而是透過狀態傳遞進行間接溝通。本研究於明確定義每個節點的目的、輸入欄位、輸出欄位、下一個節點與下一節點所需輸入。此設定不僅用於輔助工作流程追蹤，也使系統在產生報告時能夠說明每一個節點的資料來源與資料流向。表\ref{tab:workflow_state_flow}整理工作流程中主要狀態欄位之流動關係。
+\text 工作流程引擎於執行時首先建立Workflow Graph，接著依序執行各節點。執行過程中，每個節點完成後均會更新Workflow State，並將結果傳遞至下一個節點。由於所有資料皆保留於共享狀態中，因此後續節點可直接存取前序節點之輸出結果。
+
+\begin{table}[H]
+    \centering
+    \caption{工作流程狀態主要欄位流動}
+    \label{tab:workflow_state_flow}
+    \tiny
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{3.7cm} >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{狀態欄位} & \textbf{產生節點} & \textbf{後續使用節點} \\
+        \midrule
+        \path{source_task, gold_path, manual_rule} & \path{mcp_context_bootstrap} & \path{input_spec_parse, semantic_constraint_reasoning, test_code_materialization} \\
+        \path{openapi_spec, endpoints} & \path{input_spec_parse} & \path{semantic_constraint_reasoning, test_case_generation} \\
+        \path{manual_doc_rules, reconciled_spec} & \path{input_spec_parse} & \path{semantic_constraint_reasoning, test_case_generation} \\
+        \path{manual_parse, evaluator_rule} & \path{semantic_constraint_reasoning} & \path{seeded_input_generation, api_execution} \\
+        \path{seeded_input_dataset} & \path{seeded_input_generation} & \path{v2_seeded_execution, test_case_generation} \\
+        \path{test_cases, test_case_summary} & \path{test_case_generation} & \path{test_code_materialization, api_execution} \\
+        \path{test_code, test_code_path} & \path{test_code_materialization} & \path{api_execution} \\
+        \path{test_results, test_metrics, test_execution_context} & \path{api_execution} & \path{analysis_workflow_decision, report_generation} \\
+        \path{decision, decision_details} & \path{analysis_workflow_decision} & \path{report_generation} \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\text 此種狀態管理方式具有三項優點。第一，各節點之間不需直接相依，降低模組耦合度。第二，所有中間結果皆保存在Workflow State中，使實驗過程具備可追蹤性。第三，當某一節點產生錯誤時，系統可根據狀態欄位快速定位資料來源與錯誤位置，有助於除錯與後續分析。
+\text 透過工作流程節點轉換決定各節點之執行順序與資料傳遞方向。本研究目前主要採用固定流程，並保留條件分支介面以支援後續擴充。此設計可在維持目前實驗可重現性的同時，保留未來加入錯誤恢復、重試控制與策略分支的彈性。目前主流程由START開始，依序通過MCP上下文初始化、規格解析、語意推理、seeded input生成、測試案例生成、測試程式實體化、API執行、工作流程決策與報告產生，最後進入END。此流程可表示如下：
+
+\begin{equation}
+START
+\rightarrow
+N_1
+\rightarrow
+N_2
+\rightarrow
+\cdots
+\rightarrow
+N_k
+\rightarrow
+END
+\end{equation}
+
+\text 其中，$N_i$代表第$i$個工作流程節點。除主流程外，系統亦保留基準版本執行節點，例如 \texttt{v2\_seeded\_execution}。這些節點用於版本比較與本研究實驗，使系統能在同一套工作流程架構中同時支援不同版本之測試流程。每個節點皆具有objective、consumes、produces、next\_node與next\_inputs等描述欄位，使系統能在執行後建立節點級追蹤紀錄。此紀錄可用於檢查節點是否取得正確輸入、是否產生必要輸出，以及後續節點是否能接收完整資料。
+
+\begin{algorithm}[H]
+\caption{工作流程引擎執行流程}
+\label{alg:workflow_engine_execution}
+\begin{algorithmic}[1]
+\REQUIRE Initial workflow state $S_0$
+\ENSURE Final workflow report
+\STATE Create StateGraph with WorkflowState
+\STATE Register workflow nodes
+\STATE Register node edges and optional conditional edges
+\STATE Compile workflow graph
+\STATE Invoke workflow with initial state $S_0$
+\FOR{each workflow node $N_i$}
+    \STATE Read required fields from current Workflow State
+    \STATE Execute node function
+    \STATE Write produced fields back to Workflow State
+    \STATE Record node trace metadata
+\ENDFOR
+\STATE Generate final report and artifact outputs
+\RETURN final workflow state and report artifacts
+\end{algorithmic}
+\end{algorithm}
+
+\text 透過上述設計，本研究能將多代理語意分析、確定性測試執行與工作流程決策整合於同一套可控制流程中。AutoGen代理僅於指定節點中執行語意推理任務，LangGraph則負責維持整體流程順序與狀態轉移。此設計可避免代理系統直接控制全域流程，降低不可預期行為，並提升實驗可重現性。
+
+\subsection{測試案例生成模組}
+\text 測試案例生成模組（Test Case Generation Module）負責將前階段所產生之OpenAPI規格、Manual Document解析結果、Gold Path資訊、MCP Context以及多代理規格討論結果，逐步轉換為可供執行之測試產出。本節所稱之測試案例生成模組，係指由語意種子生成（Seeded Input Generation）、抽象測試案例生成（Test Case Generation）以及測試程式實體化（Test Code Materialization）所構成之上位測試生成流程。
+\text 傳統OpenAPI測試工具多依據參數型別、Schema結構或隨機策略產生測試輸入，容易產生大量語法正確但語意無效之請求。本研究則結合語意種子生成、測試案例推理以及測試程式實體化三個階段，使測試流程能夠從規格層逐步轉換為實際可執行之測試程式。
+\text 本模組於整體架構中的位置介於多代理協作模組與API執行模組之間，負責完成從規格知識到測試執行程式之轉換。
+
+\text 依據目前系統實作，測試案例生成模組的三個工作流程階段構成節點，形成階段式轉換流程：
+\begin{equation}
+Seeded\ Input
+\rightarrow
+Test\ Case
+\rightarrow
+Executable\ Test\ Code
+\end{equation}
+
+\text 其中，Seeded Input主要負責建立語意化測試資料；Test Case負責建立抽象測試案例與請求序列；Test Code Materialization則負責產生實際可執行之測試程式。
+
+測試案例生成模組主要使用之資料結構如表\ref{tab:test_generation_data_structures}所示。
+
+\begin{table}[htbp]
+\centering
+\caption{測試案例生成模組核心資料結構}
+\label{tab:test_generation_data_structures}
+\renewcommand{\arraystretch}{1.3}
+\scriptsize
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.0cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{資料結構} & \textbf{用途} \\
+\midrule
+\path{OpenAPI Specification} &
+提供端點與參數定義 \\
+\path{Manual Parse} &
+提供人工文件解析結果 \\
+\path{Seeded Input Dataset} &
+保存語意化輸入資料 \\
+\path{Test Case} &
+保存抽象測試案例 \\
+\path{Test Case Summary} &
+保存測試案例統計資訊 \\
+\path{Candidate Parameter Context} &
+保存候選參數來源資訊 \\
+\path{Generated Test Code} &
+保存可執行測試程式 \\
+\path{Code Review Result} &
+保存測試程式審查結果 \\
+A2A Trace &
+保存代理間協作紀錄 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\text 語意種子生成主要負責建立語意化測試輸入資料集，此設計受到RESTLess語意增強測試資料生成概念之啟發，但實作方式結合本研究之Manual Document、Gold Path與MCP Context，使系統產生之輸入資料不僅符合參數型別要求，同時符合業務語意需求。其目的並非保證所有請求皆成功，而是降低明顯不合理輸入所造成之無效請求比例。
+\text Seeded Input資料集之資料來源主要包含：OpenAPI Example Value、Enum Value、Document Rule、Gold Path Parameter及歷史成功請求資訊。產出的Seeded Input Dataset將作為後續抽象測試案例生成之主要輸入來源。其後，Test Case Generation會根據Seeded Input Dataset與規格知識建立抽象測試案例。此階段所建立之測試案例仍屬抽象表示，尚未轉換為實際程式碼。最終，Test Code Materialization會將抽象測試案例轉換為可直接送入Runtime Execution節點之可執行測試程式。其中，Code Review Result來自Reviewer Agent之審查結果，測試程式產生階段採用雙代理協作模式。其流程如下：
+
+\begin{equation}
+TestAuthor
+\leftrightarrow
+TestReviewer
+\end{equation}
+
+\text Test Author Agent負責建立測試程式內容；Test Reviewer Agent則負責檢查API呼叫完整性、參數綁定合理性、驗證邏輯一致性以及Manual Rule符合性，審查完成後再輸出最終版本測試程式。
+\text 測試案例生成模組實際扮演測試知識轉換層（Testing Knowledge Transformation Layer）之角色，其功能為將規格理解結果逐步轉換為可執行之API測試程式，作為後續Execution與Workflow Decision之基礎。
+
+\subsection{API執行與結果蒐集模組}
+\text 根據前一階段所產生之可執行測試程式與測試案例轉換此模組將為實際RESTful API呼叫，並於執行過程中蒐集回應結果、執行軌跡、錯誤資訊與決策訊號。相較於傳統僅驗證HTTP狀態碼之測試方式，本研究進一步保留完整執行上下文（Execution Context）、工作流程狀態轉移資訊以及可觀測性資料（Observability Data），使後續工作流程決策模組與離線強化學習模組能取得足夠之狀態資訊進行分析與學習。
+\text 本模組於工作流程中對應之節點為 \texttt{api\_execution}，主要輸入包含測試案例、測試程式碼、規格解析結果與執行環境資訊；
+\text 此階段不採用模擬回應（Mock Response）或離線重播（Replay）方式，而是直接連線至實際API服務環境，以取得真實執行結果。所有測試案例均透過開發者授權取得之Access Token進行存取，並依據OpenAPI規格中定義之HTTP Method、Path Parameter、Query Parameter與Request Body建立請求內容。
+\text Execution完成後，系統將建立標準化測試結果紀錄，其主要包含：測試案例識別碼（Case ID）、API端點（Endpoint）、HTTP方法（Method）、HTTP狀態碼（Status Code）、回應內容（Response Payload）、執行時間（Latency）、執行結果（Pass／Fail）、錯誤分類（Error Type）及執行步驟資訊（Step Information）。
+\text Execution模組接收測試案例生成模組所產生之測試案例與測試程式碼，執行完成後將結果傳遞至Telemetry Collection與Execution Trace Logging，並同步提供Decision Agent建立Workflow Decision State所需之執行資訊。
+\text Telemetry Collection 負責於 API 執行期間蒐集結構化觀測資料，其主要來源包含 HTTP 執行結果、依賴解析訊號、授權狀態與工作流程進度訊號。上述訊號經整合後形成統一之執行上下文（Execution Context），供後續三個用途使用：
+\begin{enumerate}
+  \item 其一，作為決策代理建立工作流程決策狀態之輸入來源；
+  \item 其二，作為執行軌跡（Execution Trace）之記錄基礎，支援流程可追蹤性與結果回溯；
+  \item 其三，經狀態摘要、行動映射與獎勵計算後，轉換為狀態－行動－獎勵－下一狀態之轉移記錄，構成 Offline-Q 策略訓練所需之離線資料集。
+\end{enumerate}
+\text 需特別說明的是，Telemetry 資料與 Offline RL Dataset 並非同一層次之資料結構。前者為原始執行觀測資料，後者須經過額外的特徵編碼與獎勵計算才能用於策略訓練。此區分有助於釐清系統在執行觀測與策略學習兩個面向上的職責邊界。
+\text Telemetry資料主要來源包含：HTTP Execution Result、Dependency Resolution Signal、Authentication Signal、Workflow Progress Signal
+\text 系統將上述訊號整合為統一之Execution Context，以供後續Workflow Decision State建立使用。Telemetry與Execution Trace屬於原始執行觀測資料；後續Offline Reinforcement Learning所使用之transition dataset，仍需經過狀態摘要、標準化行動映射與獎勵計算後，才轉換為可供策略訓練之狀態－動作－獎勵－下一狀態資料。
+\text Telemetry資料集主要包含表\ref{tab:telemetry_fields}所示欄位。
+
+\begin{table}[htbp]
+\centering
+\caption{Telemetry主要蒐集欄位}
+\label{tab:telemetry_fields}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{4cm} p{10cm}}
+\toprule
+\textbf{欄位} & \textbf{說明} \\
+\midrule
+HTTP Status &
+API回應狀態碼 \\
+Status Group &
+狀態群組分類結果 \\
+Semantic Error Type &
+語意錯誤分類結果 \\
+Retry Count &
+目前重試次數 \\
+Dependency Status &
+依賴資源狀態 \\
+Request Quality &
+請求品質資訊 \\
+Workflow Progress &
+工作流程進度資訊 \\
+Signal Quality &
+訊號品質資訊 \\
+Authentication State &
+驗證資訊狀態 \\
+Budget State &
+成本與資源狀態資訊 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\text 當API執行完成後，系統首先擷取HTTP回應與錯誤資訊，接著分析授權狀態、資源綁定情況、重試紀錄與流程進度，最後統一封裝為Execution Context結構。該Execution Context將作為Decision Agent建立Workflow Decision State之主要資料來源。
+\text 而Trace Logging負責記錄測試執行期間之完整工作流程軌跡（Execution Trace），以保留系統於每一階段所產生之中介結果與決策資訊。此設計之目的在於提供可重播（Replayable）、可追蹤（Traceable）與可分析（Analyzable）之執行紀錄，使研究者能夠追蹤單一測試案例於工作流程中的完整生命週期。
+\text Workflow Level Trace記錄整體工作流程節點執行情形；Test Case Level Trace記錄單一測試案例之執行結果；Step Level Trace則記錄細部HTTP請求與回應資訊。最終產生之Trace Artifact將作為報告產生模組、策略分析模組與Offline Reinforcement Learning資料集建構模組之重要輸入來源。
+\text API執行與結果蒐集模組位於整體工作流程之執行核心位置，負責將抽象測試案例轉換為實際RESTful API互動行為，並蒐集執行期間之各類可觀測性資料。透過Execution、Telemetry Collection與Trace Logging三個子模組，本系統能夠建立完整之執行上下文、工作流程訊號與決策分析資料，進一步支援後續Workflow Decision、Offline Reinforcement Learning以及報告產生等模組之運作。
+
+
+
+\subsection{實驗版本與策略演化設計}
+\text 為說明各項模組逐步加入後對 RESTful API 自動化測試流程的影響，本研究設計 v1 至 v5 五個版本，作為累積式系統能力演進之描述。此版本設計並非嚴格單因素消融實驗，而是用於呈現規格理解、語意輸入建構、多代理協作、工作流程決策與恢復能力如何逐步被納入同一套測試框架中。
+\text 本研究之主實驗以100筆人工文件與gold path定義之測試案例作為評估基準。每一筆測試案例皆包含任務描述、必要輸入、操作順序、預期結果與可接受失敗條件。因此，v1至v5的比較重點不僅在於HTTP請求是否回傳2XX結果，也在於系統是否能依據manual rule完成任務層級判定。完整OpenAPI端點層級測試則保留為補充實驗，用於觀察系統於較大API集合上的執行穩定性與泛化情形。
+\text v1為隨機執行基準版本。此版本不使用manual rule、不使用seeded input，也不導入多代理協作或工作流程決策策略。其主要目的在於建立最低基準線，觀察在缺乏規格語意與依賴資訊的情況下，系統直接產生請求並執行API時能達到的基本通過率。此版本可用來說明隨機輸入在RESTful API測試中容易造成大量無效請求。
+\text v2為規格感知與種子輸入版本。此版本導入OpenAPI規格解析與seeded input，使系統能根據端點、HTTP方法、參數型別、請求主體與欄位描述產生較合理的測試輸入。v2的目的在於驗證OpenAPI schema-aware request construction是否能有效改善v1隨機輸入造成的低通過率問題。相較於v1，v2開始具備基本規格理解能力，但尚未完整利用人工文件中的任務邏輯、gold path與可接受失敗規則。
+\text v3為manual parsing、seeded input與多代理測試實體化版本。此版本在v2基礎上加入manual rule parsing、gold path理解、多代理語意討論、測試案例生成與pytest materialization。系統透過QA Agent、Developer Agent、Test Author Agent、Test Reviewer Agent與Moderator Agent進行任務分解、語意檢查與測試程式審查，使測試流程不僅依賴OpenAPI結構，也能參考人工文件所描述的任務語意與操作順序。v3可視為本研究多代理RESTful API測試框架的基本完成版本。
+\text v4在v3基礎上加入規則式工作流程決策策略。此版本導入Decision Agent與rule-based workflow decision policy，使系統能根據API執行結果進行任務層級判定。當API回傳非2XX結果時，v4不再直接將其視為失敗，而是根據manual rule、acceptable failure與錯誤分類判斷是否屬於可接受完成。此版本主要用於建立decision-aware baseline，驗證workflow-level verdict與規則式決策邏輯對RESTful API測試評估之影響。
+\text v5在v3基礎上導入離線Q值執行期決策選擇器。與v4依賴規則式策略不同，v5使用離線工作流程轉移資料集訓練Offline-Q Runtime Policy。此策略採用表格式擬合Q值迭代，根據歷史狀態、行動、下一狀態與獎勵估計不同狀態下各行動的價值，並於執行階段選擇Q值最高的行動。v5的設計目的在於使系統能從歷史轉移資料中學習何時應重試、解析資源、更新授權、重新生成資料或進入報告流程，並驗證學習型工作流程決策策略是否能於相同工作流程環境下提供額外恢復能力。
+
+\text 在詮釋各版本數字時，有兩點前提需要說明。其一，v1 至 v2 之評估以 HTTP 狀態碼作為主要通過條件，v3 至 v5 則導入 manual rule進行任務層級判定，評估標準的收緊會直接影響絕對通過率，因此v2 至 v3 之間的數字變化不宜單純解讀為系統能力的退步。其二，v4 與 v5 並非在 v3 之上各自累積新能力，而是在相同測試生成基礎上替換工作流程決策機制，其比較重點在於兩種決策策略各自的有效情境，而非通過率的絕對高低。
+\text 基於上述設計邏輯，本研究對各版本數字的詮釋重點如下：v1 至 v2的提升反映規格導向輸入建構的效益；v3 相對於 v2 的變化反映評估標準收緊後的任務層級校正；v4 與 v5 相對於 v3 的差異則反映工作流程決策層的介入效果，其中 v5 新增之 Workflow Recovered Pass為本研究工作流程恢復能力的主要觀測指標。
+
+\begin{table}[H]
+    \centering
+    \caption{v1至v5實驗版本設計}
+    \label{tab:version_design_v1_v5}
+    \scriptsize
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabularx}{\textwidth}{>{\centering\arraybackslash}p{0.8cm} >{\raggedright\arraybackslash}p{4.8cm} >{\raggedright\arraybackslash}X}
+        \toprule
+        \textbf{版本} & \textbf{版本定位} & \textbf{主要設計目的} \\
+        \midrule
+        v1 & Monkey Random Execution & 不使用manual rule、seeded input、多代理或決策策略，作為隨機執行基準線。 \\
+        v2 & Spec + Seeded Input & 使用OpenAPI解析與seeded input改善請求建構品質，驗證規格感知輸入生成之效果。 \\
+        v3 & Manual Parsing + Seeded Input + Multi-Agent Materialization & 整合manual rule、gold path、多代理測試案例生成與pytest實體化，形成多代理API測試基本版本。 \\
+        v4 & v3 + Rule-based Workflow Decision Policy & 加入規則式工作流程決策策略，根據manual rule與acceptable failure進行workflow-level verdict。 \\
+        v5 & v3 + Offline-Q Runtime Decision Selector & 使用離線Q值策略根據歷史轉移資料選擇下一步行動，支援資源解析、重試、授權更新、資料重建與報告行動。 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\text 綜合而言，v1至v5之比較應視為同一套系統逐步加入不同能力模組後的描述性演進，而非演算法競賽式之單因素效能比較。 特別是v4與v5的關係需要進一步說明。兩者在測試生成層面完全相同（均基於v3），差異存在於兩個層面：其一為決策策略的表示方 式，v4 採用規則映射，v5 採用 Offline-Q 值查表；其二為恢復行動 的觸發條件，v4 之規則式策略在特定情境下可能未能觸發 resolve\_resource 行動，而 v5透過學習型策略在 404 資源依賴缺 失情境中穩定選擇此行動，此為兩者產生不同恢復結果的主要原因。 因此，v4 與 v5 之差異不應單純解讀為「rule-based vs. learning-based」的策略優劣，而應理解為兩種機制在特定錯誤情境下的觸發有效性差異。基於上述設計邏輯，本研究後續對版本結果之解讀以能力演進描述與決策策略可行性分析為主，Workflow Recovered Pass為工作流程恢復能力之核心觀測指標。
+\text 除決策策略本身外，本研究另行區分工作流程恢復層與工作流程決策策略兩個概念，並說明兩者之協作關係。工作流程決策策略負責在當前狀態 $s_t$ 下，從既定動作空間 $\mathcal{A}$ 中選擇下一步行動。動作空間包含五種標準化行動，前四者為恢復型行動，後者為終止型行動。 工作流程恢復層則負責將決策策略所選擇之恢復型行動落地執行，提供具體的補救機制後再次執行。恢復執行完成後，其結果將再次進入決策節點，形成可觀測之閉迴路。換言之，決策策略回答「此刻應該選哪一種行動」，恢復層回答「所選行動如何被具體執行」，兩者分工使系統在架構上得以將策略選擇與補救執行解耦，並支援後續對不同決策策略（rule-based 與 Offline-Q）的替換比較。
+
+\section{工作流程決策策略設計}
+\text 在RESTful API自動化測試在實際執行過程中，經常受到環境因素、授權限制、資源依賴關係以及測試資料品質等因素影響。非2XX HTTP回應不必然代表整體測試流程應立即停止，不同狀態碼與錯誤類型可能代表不同的後續處理需求。例如，401 可能與授權狀態有關，404 可能與資源依賴有關，422 可能與輸入資料語義有關，5XX 可能與伺服器暫時性狀態有關，而超時或網域名稱解析失敗（DNS Resolution Failure）則可能與外部環境有關。因此，單次請求失敗並不一定代表系統功能存在缺陷，而可能來自於測試環境或執行流程所造成之非產品缺陷（Non-product Failure）。若無法進一步判斷錯誤來源並採取適當補救措施，將難以支援長流程API測試與可重播評估，將造成大量誤判結果。
+\text 因此，本研究提出將RESTful API測試流程建模為一個序列決策問題（Sequential Decision Problem），由決策代理（Decision Agent）負責在API執行後接收API執行器所產生的HTTP狀態碼、錯誤類型、執行軌跡、資源依賴狀態、重試次數與歷史執行結果，將其轉換為工作流程狀態（Workflow State），並選擇下一個工作流程行動，以提升測試流程完成率與結果可靠性。
+\text 本研究所處理的問題在於某一步API請求執行完成後，下一步工作流程應採取何種行動。其決策單位為單一test case之單一步驟在一次API執行結果之後的一次post-execution workflow action selection；決策時機發生於API request已送出且response或error已返回之後，亦即位於execution之後、report之前。其輸入不是單一句法錯誤訊息，而是由HTTP狀態碼、語意錯誤類型、依賴綁定情況、重試歷史、授權狀態、工作流程進度與執行軌跡等資訊所構成之結構化工作流程狀態；其輸出則為可執行、可統計且可學習之標準化工作流程行動。此一設計之目標不是單純提升單次HTTP成功率，而是最大化workflow continuation與final test-case completion，使系統能判斷在當前狀態下應重試、補足依賴資源、更新授權、重新產生資料，或直接進入報告與歸因流程。
+\text 為明確界定本研究的問題範圍，工作流程決策與相關方法有所不同。Retry Policy通常僅處理單一請求是否重試；Test Repair與Self-Healing Test主要著重失敗測試腳本或執行步驟之修補；Agent Planning與Task Planning則著重任務分解、代理分工與執行規劃；一般Recovery Strategy多半僅描述補救原則，未必形成可比較之狀態轉移決策模型。相較之下，本研究的工作流程決策問題是以API執行後的狀態為核心，根據結構化執行上下文決定下一步工作流程行動，並將其形式化為可重播、可比較與可學習的序列決策問題\cite{Song2023RestGPT}\cite{Wu2023AutoGen}。表 \ref{tab:workflow_decision_comparison} 所比較之相關方法，涵蓋RESTful API測試中的請求生成與依賴推理方法\cite{Zheng2024RESTLess,Nguyen2024KAT,Kim2025LlamaRestTest}、多代理協作與任務規劃方法\cite{Wu2023AutoGen,Song2023RestGPT}，以及序列決策建模之理論基礎\cite{rao2022foundations}。
+\begin{table}[H]
+\centering
+\caption{Workflow Decision與相關方法比較}
+\label{tab:workflow_decision_comparison}
+\scriptsize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.2cm} >{\raggedright\arraybackslash}p{1.9cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X >{\centering\arraybackslash}p{1.5cm} >{\centering\arraybackslash}p{1.7cm} >{\centering\arraybackslash}p{1.7cm}}
+\toprule
+\textbf{方法類型} & \textbf{決策單位} & \textbf{輸入資訊} & \textbf{輸出行動} & \textbf{是否考慮歷史狀態} & \textbf{是否支援恢復機制} & \textbf{是否適合實時 API} \\
+\midrule
+Workflow Decision（本研究） & 工作流程層級 & HTTP狀態碼、錯誤類型、執行軌跡、資源依賴、授權狀態、重試次數、歷史結果 & 重試、資源解析、更新授權、重生資料、報告 & 是 & 是 & 是 \\
+Retry Policy & 單次請求層級 & 當前錯誤或狀態碼 & \path{retry / stop} & 否或弱 & 有限 & 部分適合 \\
+Test Repair & 測試腳本層級 & 失敗腳本、定位錯誤、斷言錯誤 & 修補腳本或斷言 & 部分 & 是 & 部分適合 \\
+Self-Healing Test & 執行期修補層級 & 執行失敗訊號、替代定位資訊、既有規則 & 替代元素、替代步驟、重新執行 & 部分 & 是 & 部分適合 \\
+Agent Planning & 任務規劃層級 & 任務目標、工具描述、上下文 & 子任務序列、代理分工 & 是 & 否或間接 & 部分適合 \\
+Task Planning & 任務分解層級 & 高層任務描述、文件、約束 & 執行步驟規劃 & 是 & 否或間接 & 部分適合 \\
+Recovery Strategy & 錯誤處理層級 & 失敗類型、錯誤規則 & 補救動作 & 部分 & 是 & 部分適合 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Decision Input、Decision State、Feature State與Metadata之對照}
+\label{tab:decision_state_layers}
+\scriptsize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{2.8cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{層級} & \textbf{形式化表示} & \textbf{內容} & \textbf{在本研究中的角色} \\
+\midrule
+Decision Input & $X_t$ & 原始執行上下文，包含 \path{case/request context}、\path{execution outcome}、\path{manual-doc context}、\path{runtime pool}、\path{short history} 與 \path{budget/node context} & 作為決策前之原始輸入，不直接作為策略查表狀態。 \\
+Decision State & $s_t=\phi(X_t)$ & 經摘要後之結構化工作流程狀態，例如HTTP狀態、語意錯誤類型、\path{dependency status}、\path{request quality}、\path{retry history}、\path{workflow progress}、\path{signal quality} 與 \path{budget state} & 作為工作流程決策之正式狀態表示，用於規則式策略與後續離線狀態抽象。 \\
+Feature State & $z_t=\psi(s_t)$ & 供Offline-Q使用之壓縮特徵狀態，例如 \path{status bucket}、\path{endpoint group}、\path{validation cluster}、\path{retry bucket}、\path{resource availability bucket} 等 & 作為v5表格式Q值策略之查表索引，以降低狀態空間稀疏性。 \\
+Metadata & -- & 原始 \path{response body}、完整 \path{error message}、\path{full manual rule}、\path{raw request template}、\path{resource pool} 原始內容、\path{evidence} 與其他輔助欄位 & 作為分析、追蹤與報告用途，不直接視為正式 state variable。 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\text 表 \ref{tab:workflow_decision_comparison} 與表 \ref{tab:decision_state_layers} 顯示，本研究所處理之工作流程決策問題，在決策單位、輸入資訊、輸出行動與恢復能力上，均不同於單純重試、測試修補或高階規劃方法；同時，本研究亦將原始執行上下文、正式決策狀態、離線特徵狀態與輔助性metadata加以區分，以避免概念混淆。
+
+\subsection{馬可夫決策過程建模}
+\text 本研究將工作流程決策問題建模為馬可夫決策過程（Markov Decision Process, MDP），馬可夫決策過程可描述代理人在目前狀態下選擇行動，並根據環境回饋轉移至下一狀態與取得獎勵的序列決策問題\cite{rao2022foundations}。在本研究中，API測試環境即為決策環境，Decision Agent則為工作流程決策者。每一次API執行完成後，系統會根據執行結果形成狀態，策略選擇下一個工作流程行動，行動執行後再產生下一狀態與對應獎勵。
+\text 就本研究的問題而言，決策輸入（Decision Input）為API執行完成後所蒐集的原始執行訊號，記為$X_t$，其可形式化表示如式 \eqref{eq:decision_input_definition} 所示：
+\begin{equation}
+\label{eq:decision_input_definition}
+X_t=(C_t,Y_t,M_t,P_t,H_t,B_t)
+\end{equation}
+\text 其中，$C_t$表示目前案例與請求上下文，$Y_t$表示本次執行結果，例如HTTP狀態碼、回應內容與錯誤訊息；$M_t$表示人工撰寫文件與任務規則相關資訊；$P_t$表示執行期資源池、授權資訊與外部上下文；$H_t$表示短期歷史紀錄，例如前一步狀態、先前動作與重試次數；$B_t$示預算與節點上下文。上述原始輸入經摘要函數$\phi$轉換為供策略使用之決策狀態，如式 \eqref{eq:decision_state_mapping} 所示：
+\begin{equation}
+\label{eq:decision_state_mapping}
+s_t=\phi(X_t)
+\end{equation}
+\text 在Offline-Q策略中，狀態$s_t$為將上述訊號摘要後形成的工作流程狀態，決策輸出（Decision Output）定義為在狀態$s_t$下所選擇之標準化工作流程行動$a_t \in \mathcal{A}$；本研究之決策目標是在當前狀態下選擇最有助於後續流程延續與最終任務完成之行動。其最佳化目標可形式化表示，如式 \eqref{eq:decision_objective} 所示：
+\begin{equation}
+\label{eq:decision_objective}
+a_t^*=\arg\max_{a \in \mathcal{A}(s_t)}
+\mathbb{E}\left[
+\sum_{k=t}^{T-1}\gamma^{k-t} r_k \mid s_t, a_t=a
+\right]
+\end{equation}
+
+\text 本研究將 MDP 定義如式 \eqref{eq:mdp_definition} 所示：
+\begin{equation}
+\label{eq:mdp_definition}
+M=(S,A,P,R)
+\end{equation}
+
+其中：
+\begin{itemize}
+\item $S$：狀態空間（State Space）
+\item $A$：動作空間（Action Space）
+\item $P$：狀態轉移機率（State Transition Probability）
+\item $R$：獎勵函數（Reward Function）
+\end{itemize}
+\text 在傳統RESTful API測試工具中，測試案例執行後通常直接根據HTTP回應結果判定成功或失敗。然而實際系統環境中，測試失敗可能來自網路異常、授權失效、資源依賴缺失或測試資料錯誤等因素。因此，單一步驟的執行結果無法完整反映系統品質。
+\text 本研究將工作流程視為一系列連續決策過程。當測試案例執行完成後，系統首先整合API執行狀態、錯誤類型、依賴關係、重試紀錄與歷史結果之結構化狀態 $s_t$，接著由工作流程決策策略選擇可選擇的後續工作流程行動 $a_t$。動作執行完成後，環境將產生新的執行結果並形成下一狀態 $s_{t+1}$，同時計算該次決策所對應之獎勵值 $r_t$。
+\text 整體流程可形式化表示如式 \eqref{eq:state_transition_flow} 所示：
+\begin{equation}
+\label{eq:state_transition_flow}
+s_t
+\rightarrow
+a_t
+\rightarrow
+s_{t+1}
+\rightarrow
+r_t
+\end{equation}
+透過持續觀察狀態轉移與獎勵回饋，策略模型可逐步學習在不同測試情境下應採取何種補救行為，以提升測試流程完成率與決策品質。
+\text 在一次測試流程中，工作流程軌跡可表示如式 \eqref{eq:workflow_trajectory} 所示：
+\begin{equation}
+\label{eq:workflow_trajectory}
+\tau=(s_0,a_0,s_1,a_1,\ldots,s_T)
+\end{equation}
+
+\text 其中，$s_t$為第$t$步的工作流程狀態，$a_t$為策略於該狀態下所選擇的工作流程行動。策略函數可表示如式 \eqref{eq:policy_function} 所示：
+\begin{equation}
+\label{eq:policy_function}
+\pi(a|s)
+\end{equation}
+
+\text 其意義為在狀態$s$下選擇動作$a$的決策規則。本研究之目標並非單純最大化單一API呼叫的HTTP成功率，而是提升整體測試流程的可持續性與測試訊號品質。因此，策略最佳化目標可表示如式 \eqref{eq:policy_optimization_objective} 所示：
+\begin{equation}
+\label{eq:policy_optimization_objective}
+\max_{\pi} \mathbb{E}\left[\sum_{t=0}^{T}\gamma^t R_t\right]
+\end{equation}
+\text 其中，$\gamma$為折扣因子，用於控制未來獎勵對目前決策的影響程度。
+
+\subsection{狀態空間設計}
+\text 狀態空間（State Space）用於描述API測試流程在某一時間點可被系統觀測到的狀態。本研究之狀態設計遵循馬可夫性質，即策略在進行決策時不直接讀取完整歷史軌跡，而是將與決策相關的歷史資訊摘要後納入目前狀態。此設計可避免策略依賴未結構化日誌，同時使相似狀態能在離線資料集中被重複比較與學習。
+\text 在本研究中，正式的狀態變數是指由決策輸入摘要後形成，並納入工作流決策狀態之結構化欄位；狀態並非僅表示單一HTTP錯誤碼，而是描述在何種工作流程狀態下出現該執行結果。因此，相同之401、404或422，可能因授權狀態、資源依賴、重試次數或流程進度不同，而對應不同之後續工作流程行動。原始的執行追蹤、完整的歷史結果與其他輔助證據則不直接作為狀態欄位，而是透過摘要形式反映於重試歷史、工作流進度、相依性狀態、訊號品質與預算狀態等狀態特徵中。
+\text 本研究所使用的狀態空間由 API 執行器所回傳之執行資訊組成結構化的決策狀態，主要包含式 \eqref{eq:state_space_definition} 所示之狀態變數：
+
+\begin{equation}
+\label{eq:state_space_definition}
+s_t=
+\left(
+s_t^{task},
+s_t^{outcome},
+s_t^{dep},
+s_t^{req},
+s_t^{hist},
+s_t^{prog},
+s_t^{sig},
+s_t^{budget},
+s_t^{runtime}
+\right)
+\end{equation}
+
+\text 其中，$s_t^{task}$表示任務與步驟識別資訊；$s_t^{outcome}$表示本次執行結果；$s_t^{dep}$表示資源依賴狀態；$s_t^{req}$表示請求品質；$s_t^{hist}$表示重試與短期歷史；$s_t^{prog}$表示工作流程進度；$s_t^{sig}$表示執行訊號品質；$s_t^{budget}$表示呼叫與時間預算狀態；$s_t^{runtime}$表示執行期附加狀態。
+\text 其中核心決策狀態可由案例識別、端點資訊、HTTP狀態、狀態群組、語意錯誤類型，以及下列子結構共同組成。資源依賴狀態可表示如式 \eqref{eq:dependency_status_definition} 所示：
+\begin{equation}
+\label{eq:dependency_status_definition}
+s_t^{dep}=
+(
+required\_inputs\_ready,
+missing\_inputs,
+bound\_from\_previous\_step
+)
+\end{equation}
+\text 請求品質可表示如式 \eqref{eq:request_quality_definition} 所示：
+\begin{equation}
+\label{eq:request_quality_definition}
+\begin{aligned}
+s_t^{req}=
+(&schema\_valid,\\
+&required\_fields\_complete,\\
+&path\_params\_resolved,\\
+&payload\_semantic\_valid)
+\end{aligned}
+\end{equation}
+\text 重試與短期歷史可表示如式 \eqref{eq:retry_history_definition} 所示：
+\begin{equation}
+\label{eq:retry_history_definition}
+s_t^{hist}=
+(
+retry\_count,
+same\_action\_count,
+recent\_failure\_pattern,
+previous\_actions
+)
+\end{equation}
+\text 工作流程進度可表示如式 \eqref{eq:workflow_progress_definition} 所示：
+\begin{equation}
+\label{eq:workflow_progress_definition}
+s_t^{prog}=
+(
+completed\_steps,
+total\_steps,
+progress\_score,
+terminal
+)
+\end{equation}
+\begin{equation}
+\label{eq:workflow_progress_score_definition}
+progress\_score=
+\begin{cases}
+\frac{completed\_steps}{total\_steps}, & total\_steps > 0\\
+0, & total\_steps = 0
+\end{cases}
+\end{equation}
+\text 執行訊號品質可表示如式 \eqref{eq:signal_quality_definition} 所示：
+\begin{equation}
+\label{eq:signal_quality_definition}
+s_t^{sig}=
+(
+execution\_signal\_score,
+diagnostic\_specificity,
+groundedness\_score
+)
+\end{equation}
+\text 預算狀態可表示如式 \eqref{eq:budget_state_definition} 所示：
+\begin{equation}
+\label{eq:budget_state_definition}
+s_t^{budget}=
+(
+api\_call\_count,
+remaining\_call\_budget,
+remaining\_time\_budget\_sec
+)
+\end{equation}
+\text 除核心決策狀態外，系統亦保留執行期增補狀態，例如端點型態、是否需要授權、前次狀態碼、資源池命中情形、歷史成功率與目前節點等欄位，作為$s_t^{runtime}$之一部分。此類欄位仍屬正式狀態變數，但主要用於執行期補充判斷。
+\text 在Offline-Q策略中，完整結構化狀態$s_t$是進一步映射為緊湊特徵狀態$z_t$。其形式可表示如式 \eqref{eq:offline_feature_state_definition} 所示：
+\begin{equation}
+\label{eq:offline_feature_state_definition}
+z_t=\psi(s_t,\textit{signal}_t)
+\end{equation}
+\text 其中，$z_t$主要由狀態群組、訊號分類、端點群組、驗證錯誤群組、缺失輸入區間、重試次數區間、是否具有更新權杖以及可用資源數量區間等特徵構成，用以降低狀態空間稀疏性。
+
+\subsection{動作空間設計}
+\text 動作空間（Action Space）定義Decision Agent可選擇的後續工作流程行動。為降低策略學習複雜度，本研究定義五種標準化決策動作（Canonical Actions）作為強化學習策略之動作空間，如式 \eqref{eq:action_space_definition} 所示：
+\begin{equation}
+\label{eq:action_space_definition}
+A=
+{
+retry,
+resolve_resource,
+refresh_token,
+regenerate_data,
+report
+}
+\end{equation}
+\text 這個動作空間是提供工作流程決策策略於執行期選擇下一步行動之用，其本質為post-execution workflow action label，而非自由文字建議或高階任務規劃結果。透過將執行後決策離散化為有限個canonical actions，系統可進一步統計不同狀態下之行動分布，並建立可供規則式策略與Offline-Q策略共同使用之決策介面。
+\text 其中，$retry$表示重新執行相同請求；$resolve_resource$表示補齊或替換必要資源後重新執行；$refresh_token$表示更新授權資訊後重新執行；$regenerate_data$表示重新產生測試資料或請求主體；$report$表示不再進行修復，直接進入報告產生與結果歸因階段。
+
+\begin{table}[H]
+\centering
+\caption{Offline-Q策略之標準化動作空間}
+\label{tab:offline_q_action_space}
+\scriptsize
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{p{3.2cm} p{5.0cm} X} % 改用 tabularx 搭配 X 欄位
+\toprule
+\textbf{Canonical Action} & \textbf{適用情境} & \textbf{決策意義} \\
+\midrule
+retry & 暫時性伺服器錯誤、網路波動或可重試狀態 & 系統判斷目前請求本身可保留，僅需重新執行以排除暫時性因素。 \\
+\texttt{resolve\_resource} & 404資源不存在、路徑參數缺失、資源池可用 & 系統嘗試從資源池、manual binding pool或runtime value pool取得可用資源識別碼後重新執行。 \\
+\texttt{refresh\_token} & 401授權錯誤、權杖失效、驗證資訊不足 & 系統更新授權資訊後重新送出請求，以避免因權杖過期造成誤判。 \\
+\texttt{regenerate\_data} & 400或422驗證錯誤、請求主體不符合語意規則 & 系統重新產生測試資料，使請求更符合schema與manual rule所描述的語意需求。 \\
+report & 權限不足、不可修復錯誤、環境異常或已具可解釋結果 & 系統停止嘗試修復，將結果分類並進入報告產生階段。 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+
+\clearpage
+\subsection{Rule-based Workflow Decision Baseline}
+\text 為評估工作流程決策機制在不使用離線強化學習之情況下的基準表現本研究建立規則式工作流程決策策略（rule-based workflow decision policy）作為可解釋之決策基準，於本研究 100 筆主實驗中對應版本v4。
+\text 其決策邏輯依據錯誤分類、HTTP 狀態群組、依賴狀態與授權狀態，從標準化動作空間中選擇後續工作流程行動，不使用 Q 值表或離線策略學習。具體規則如表 \ref{tab:rule_based_policy} 所示。
+\text 規則式策略之基本邏輯為：若狀態屬於授權錯誤，優先選擇更新授權資訊；若狀態屬於資源不存在，優先選擇解析資源並重新執行；若狀態屬於驗證錯誤，優先選擇重新產生測試資料；若狀態屬於權限不足、環境錯誤或已可解釋狀態，則進入報告階段。此策略可視為根據RESTful API測試經驗建立之專家策略，其優點是可解釋性高、行為穩定，且在錯誤類型明確的情境下通常能達到良好效果；缺點是難以根據歷史執行結果自動修正策略，也難以在多種候選行動皆可能合理時進行資料驅動的行動偏好比較。
+
+\begin{table}[H]
+\centering
+\caption{Rule-based Workflow Decision Baseline之決策規則}
+\label{tab:rule_based_policy}
+\scriptsize
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.9cm} >{\raggedright\arraybackslash}p{3.4cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{狀態群組} & \textbf{優先行動} & \textbf{說明} \\
+\midrule
+\path{invalid_auth} 或 \path{auth_error} & \path{refresh_token} & 授權資訊可能失效，優先更新授權後重試。 \\
+\path{insufficient_permission} & \path{report} & 權限不足通常不宜透過重試解決，應分類並產出報告。 \\
+\path{not_found} & \path{resolve_resource} & 資源不存在可能由錯誤資源識別碼或前置資源缺失造成，應先嘗試資源解析。 \\
+\path{validation_error} & \path{regenerate_data} & 驗證錯誤通常與請求資料語意或格式有關，應重新生成資料。 \\
+\path{server_error} 或 \path{rate_limit} & \path{retry} 或 \path{report} & 暫時性錯誤可重試；若重複出現則進入報告階段。 \\
+\path{environment_error} & \path{report} & 環境錯誤應隔離，不應污染API功能缺陷判定。 \\
+\path{success} & \path{report} & 測試已取得可用結果，進入報告階段。 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\text 需說明的是，rule-based策略在本研究中承擔兩項功能：其一為提供可解釋之決策邏輯，使工作流程決策過程具備可追蹤性；其二為作為學習型策略（Offline-Q）之比較基準，以評估資料驅動方法相對於專家規則的增量效益與限制。值得注意的是，rule-based 策略之設計重點在於決策判定的正確性，而非直接提升通過率，是反映在當前測試情境下，規則式決策判定與無決策層之結果在任務層級上高度一致。v4之主要貢獻在於建立可供Offline-Q訓練之工作流程決策事件資料集，並確立決策層的架構基礎供v5使用。
+
+\subsection{Offline-Q Workflow Decision Policy}
+\text 本研究於工作流程決策模組之上建置離線強化學習（Offline Reinforcement Learning）模組，作為v5版本之學習型工作流程決策策略可行性探索。其目的並非提出新的強化學習演算法，亦非預設其已優於規則式策略，而是驗證工作流程決策問題是否可被形式化為離線狀態－動作價值學習問題，並觀察在當前訓練資料規模與單一API領域條件下，學習型策略能否習得部分有效之決策模式。此模組所處理的問題是在單一步驟API執行完成後，根據當前決策狀態選擇下一個標準工作流動作。Offline-Q所學習的是「在既有恢復機制存在的前提下，於當前工作流程狀態$s_t$下應優先選擇哪一種標準化行動」。與rule-based策略依預定規則進行確定性映射不同，Offline-Q透過離線轉移資料估計各狀態下不同行動的長期價值，並以Q值作為行動偏好的依據。
+\text 此設計適合RESTful API測試情境，因為真實API執行具有成本、速率限制、權限限制與環境波動，不適合大量在線探索。其目的並非直接學習API操作序列生成，而是學習測試執行失敗後之恢復決策（Recovery Decision）與工作流程控制策略（Workflow Control Policy）。因此，Offline Reinforcement Learning之作用範圍位於API執行完成之後，由Decision Agent根據執行結果建立決策狀態，並透過離線策略推論下一步工作流程行動。
+
+\text 圖 \ref{fig:v5_data_workflow_architecture} 整理本研究於v5版本中的決策資料流，由測試生成、API執行、工作流程轉移資料蒐集到Offline-Q決策之整體資料流，整理從輸入規格與人工文件、測試案例與測試程式生成、API執行、轉移資料集建構，到Offline-Q Policy推論與最終報告輸出之流程。這說明了非僅於API執行後額外附加一個決策器，而是將前段測試生成、執行結果蒐集與後段決策學習串接為同一條可追蹤之資料流。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\textwidth]{static-page/DataWorkflow_architecture.png}
+    \caption{v5版本之測試生成、執行與Offline-Q決策資料流}
+    \label{fig:v5_data_workflow_architecture}
+\end{figure}
+
+\text 如圖 \ref{fig:v5_data_workflow_architecture} 所示，OpenAPI規格與人工文件先作為前段輸入，分別支援seeded input建構與測試案例生成；其後系統完成測試程式生成並執行API請求，蒐集執行結果、狀態轉移與候選恢復行動。這些執行事件進一步被整理為transition dataset，作為Offline-Q Policy之訓練與推論基礎。換言之，工作流程決策並非孤立存在，而是建立在前段測試生成品質、執行狀態觀測與轉移資料累積之上。圖 \ref{fig:decision_agent_offline_q} 更說明了Decision Agent與Offline-Q Policy之關係，展示了Decision Agent內部的決策資料流與策略查表機制。相較於前述代理架構圖著重代理在整體流程中的配置位置，說明狀態、環境、行動與策略更新之對應關係。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.88\textwidth]{static-page/DecisionAgentwPolicy.png}
+    \caption{Decision Agent與Offline-Q Policy之決策資料流}
+    \label{fig:decision_agent_offline_q}
+\end{figure}
+
+\text 圖 \ref{fig:decision_agent_offline_q} 所示，Decision Agent位於工作流程決策層，負責接收API執行後所形成之決策狀態，並將其轉換為可供Offline-Q Policy查表之特徵狀態。Offline-Q Policy根據當前狀態對各候選行動之Q值估計，選擇下一步標準化工作流程行動，再由執行環境產生對應之下一狀態與回饋訊號。訓練階段則透過歷史工作流程轉移資料與獎勵值更新策略，使Decision Agent於執行階段能以既有Q-table進行推論，而不需於實時API環境中進行高成本之即時探索。
+\text 與傳統線上強化學習需於真實環境中持續探索不同動作不同，本研究採用離線強化學習設計，所有訓練資料皆來自實際測試執行期間所蒐集之工作流程決策事件（Workflow Decision Event），並轉換為狀態－動作－獎勵－下一狀態（State-Action-Reward-Next State）轉移資料集。此設計可避免於真實RESTful API服務中進行大量探索所造成之成本、速率限制（Rate Limit）與權限風險，同時保留完整決策軌跡供後續策略訓練與重播分析。
+\text Offline Dataset 建構將工作流程執行期間所產生之決策事件轉換為離線強化學習資料集，其主要功能為擷取Decision Agent所需要之工作流程狀態、實際執行動作、獎勵值以及下一個狀態，建立可供Offline-Q訓練之轉移資料。
+\text Decision Agent輸出之決策事件紀錄，並將產生之資料集提供Offline-Q Training模組進行訓練。由於工作流程狀態包含大量結構化資訊，因此本研究於訓練前先進行狀態特徵編碼（State Feature Encoding），將原始狀態轉換為固定特徵索引（Offline Feature Key），降低狀態空間維度並提升離線策略可訓練性。根據工作流程狀態抽取多項決策相關特徵如下：
+
+\text 系統將每筆工作流程決策紀錄轉換為式 \eqref{eq:transition_dataset} 所示之轉移資料集：
+\begin{equation}
+\label{eq:transition_dataset}
+D=\{(z_t,a_t,r_t,z_{t+1})\}
+\end{equation}
+\text 其中，$z_t$表示目前特徵狀態，$a_t$表示實際採取之標準化動作，$r_t$表示轉移獎勵，$z_{t+1}$表示行動後之下一個特徵狀態。接著，系統依據特徵狀態索引建立Q值表$Q(z,a)$，用於估計在特徵狀態$z$下採取動作$a$之預期價值。其更新過程如式 \eqref{eq:q_update_rule} 所示：
+\begin{equation}
+\label{eq:q_update_rule}
+Q(z,a)\leftarrow
+\mathrm{mean}\left(
+r+\gamma \max_{a'}Q(z',a')
+\right)
+\end{equation}
+
+\begin{itemize}
+\item $r$ 為即時獎勵
+\item $\gamma$ 為折扣因子
+\item $z'$ 為下一狀態
+\item $a'$ 為下一步候選動作
+\end{itemize}
+
+\text 而$\gamma$為折扣因子，表示後續狀態價值對目前決策仍具有重要影響；$a’$為下一狀態下的候選動作。本研究設定訓練迭代次數，以反覆更新狀態-動作價值估計。依目前專案實作，v5策略之狀態數及動作空間大小為訓練演算法標記為\texttt{tabular\_fitted\_q\_iteration}。
+\begin{table}[H]
+\centering
+\caption{Offline-Q主要狀態特徵}
+\label{tab:offline_state_features}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{5cm} p{8cm}}
+\toprule
+特徵類型 & 說明 \\
+\midrule
+Status Bucket & HTTP狀態碼分類 \\
+Signal Classification & 錯誤訊號分類 \\
+Endpoint Group & API端點群組 \\
+Endpoint Depth & API路徑深度 \\
+Retry Count Bucket & 重試次數區間 \\
+Missing Input Bucket & 缺失資源數量 \\
+Validation Cluster & 驗證錯誤群組 \\
+Validation Signature & 驗證缺失特徵 \\
+Available Resource Bucket & 可用資源數量 \\
+Request Method & GET、POST、PUT、DELETE等 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\text 特徵編碼完成後將產生唯一State Key：
+
+\begin{equation}
+\label{eq:state_key_definition}
+StateKey = f(z_t)
+\end{equation}
+
+\text 此索引作為Q-table查詢與更新依據。State Feature Encoding為Offline Dataset與Offline-Q Training之共同基礎模組，同時於Policy中重複使用，以確保訓練與推論使用一致之特徵空間。
+\text Offline-Q Training會根據歷史轉移資料估計各狀態－動作組合之長期價值，並建立工作流程決策策略。本研究之Offline-Q策略採用表格式擬合Q值迭代（Tabular Fitted Q Iteration）作為訓練方法。為避免符號混淆，訓練與推論階段皆以特徵狀態$z_t$作為Q-table之查表單位。
+
+\text 系統定義之Canonical Action Space如下：
+
+\begin{table}[H]
+\centering
+\caption{Offline-Q Action Space}
+\label{tab:offline_q_actions}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{p{4cm} p{9cm}}
+\toprule
+Action & 說明 \\
+\midrule
+retry & 重試原請求 \\
+resolve\_resource & 補齊依賴資源 \\
+refresh\_token & 更新授權資訊 \\
+regenerate\_data & 重新生成測試資料 \\
+report & 直接進入報告流程 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\text 訓練完成之Q-table將輸出供Policy於執行期間載入使用。在測試執行期間，系統先將當前決策狀態$s_t$轉換為對應之特徵狀態$z_t$，再由Offline-Q策略查詢各候選動作之價值並選擇最佳行動。如式 \eqref{eq:greedy_action_selection} 所示：
+\begin{equation}
+\label{eq:greedy_action_selection}
+a^*=\arg\max_a Q(z_t,a)
+\end{equation}
+\text 系統選擇分數最高的行動作為下一步工作流程決策，此機制使系統能根據歷史學習結果，自動判斷是否應重新執行請求、補齊依賴資源、更新授權資訊、重新生成測試資料，或直接結束測試流程並產生報告。
+\text 本節所提出之離線Q值策略，定位為學習型決策策略於工作流程決策問題中之可行性驗證，而非以超越規則式策略為直接目標。此定位源於兩項設計前提：其一，本研究主實驗之核心觀測重點為工作流程恢復能力與流程延續性，而非單純之通過率提升；其二，離線強化學習策略之表現受訓練資料規模、狀態覆蓋與行動分布影響顯著，在當前單一API領域與有限資料條件下，策略學習結果需審慎解讀。
+\text 因此，Offline-Q策略相對於規則式策略之效益差異，應結合第四章實驗結果與研究限制共同分析，以區分「策略學習本身之可行性」與「在當前資料條件下之實際表現」兩個層次。
+
+\subsection{Process Reward Modeling觀點之獎勵設計}
+\text 傳統強化學習多以最終結果作為獎勵來源（Outcome-based Reward），即根據任務是否成功完成給予正向或負向回饋。然而在RESTful API自動化測試情境中，單純依賴最終測試結果往往無法充分反映決策品質，API測試流程中的重試、資源解析、授權更新與資料重新生成皆屬於中間過程決策，其品質會直接影響後續測試能否繼續推進。例如，當系統收到HTTP 404錯誤時，若直接結束測試流程，最終結果可能為失敗；然而若系統能正確識別該錯誤源自於資源尚未建立，並執行資源補齊後重新測試，則可能成功完成後續驗證。此類情況顯示測試結果不僅受到最終狀態影響，更受到中間決策過程品質所影響。
+\text 為使離線強化學習策略能學習工作流程決策品質，本研究之獎勵設計並非單純以HTTP 2XX作為唯一正向獎勵，而是參考近年大型語言模型推理優化中所提出之程序獎勵模型（Process Reward Modeling, PRM）概念\cite{Lightman2023PRM}，將獎勵評估重點由單一最終結果延伸至整體決策軌跡（Decision Trajectory），評估每一步工作流程狀態轉移是否改善測試流程品質。
+\text 在本研究中的決策軌跡表示如式 \eqref{eq:prm_trajectory} 所示：
+\begin{equation}
+\label{eq:prm_trajectory}
+\tau=
+(s_0,a_0,s_1,a_1,\cdots,s_T)
+\end{equation}
+\text 其中每一次狀態轉移均代表工作流程決策模組對當前執行狀態所做出的處理選擇。與傳統 Outcome Reward 僅評估最終結果不同，本研究將每一步決策視為一個局部品質評估單元（Local Decision Unit），並根據決策後所產生之狀態改善程度計算轉移獎勵（Transition Reward），使系統能學習不同決策對流程品質所造成的影響。
+令轉移獎勵函數如式 \eqref{eq:transition_reward_function} 所示：
+\begin{equation}
+\label{eq:transition_reward_function}
+r_t=
+f(s_t,a_t,s_{t+1})
+\end{equation}
+
+\begin{itemize}
+\item $s_t$：目前狀態
+\item $a_t$：執行動作
+\item $s_{t+1}$：下一狀態
+\end{itemize}
+
+\text 本研究之獎勵設計並非僅根據單次HTTP回應是否成功給分，而是將工作流程行動視為一種狀態轉移決策，評估某一行動是否使測試流程朝向較可完成、較可綁定且較符合人工文件之方向前進。因此，本研究之獎勵屬於狀態轉移獎勵（Transition Reward），其評估對象為$(s_t, a_t, s_{t+1})$，而非單一時點之執行結果或固定行動偏好。
+
+\text 當決策能改善執行狀態時給予正向獎勵；若造成無效操作、重複失敗或不必要之工作流程擴張，則給予負向獎勵。雖然本研究最終採用表格式擬合Q迭代（Tabular Fitted Q Iteration）進行離線策略訓練，但其獎勵訊號設計已具有程序獎勵模型之特性。換言之，本研究並非僅學習最終測試結果是否成功，而是透過累積決策軌跡中每一步狀態轉移所獲得之獎勵，學習何種工作流程決策能有效改善測試執行品質。此設計使離線Q學習策略能夠利用歷史執行資料學習較佳之錯誤恢復與流程修正行為。
+
+\text 對於第$t$步工作流程決策，本研究先計算狀態$t$之語意轉移分數，再比較狀態$t+1$相對於狀態$t$之改善程度。其語意轉移分數定義如式 \eqref{eq:transition_score_definition} 所示：
+\begin{equation}
+\label{eq:transition_score_definition}
+S_{\text{transition}}(t)=0.35\,S_{\text{schema}}(t)+0.35\,S_{\text{binding}}(t)+0.30\,S_{\text{METEOR}}(t)
+\end{equation}
+
+\text 其中，$S_{schema}(t)$表示第$t$步請求在結構與欄位層面之正確性分數，用以衡量目前請求是否符合OpenAPI規格、必要欄位是否完整、路徑參數是否解析，以及payload結構是否有效；$S_{binding}(t)$表示第$t$步跨步驟輸出綁定與依賴解析的正確性分數，用以衡量目前請求所需資源是否已從前序步驟、manual rule、resource pool或runtime value pool取得；$S_{METEOR}(t)$表示第$t$步轉移語意描述實際執行結果與人工文件或gold path參考描述的語意接近程度分數，用以衡量目前狀態轉移是否更接近人工文件所定義之預期流程。三者皆正規化於區間$[0,1]$。\text 在計算語意改善量時，本研究先定義語意轉移差分如式 \eqref{eq:semantic_delta_definition} 所示：
+\text 本研究中，$S_{METEOR}(t)$所使用之參考描述，並非來自抽象文字假設，而是根據人工文件結構化檔案 \texttt{semantic\_restbench\_tmdb\_motified.csv} 之欄位內容組成。對於每一筆測試任務，系統會綜合任務指令、gold path、步驟編號、API步驟、依賴綁定、成功條件與可接受失敗條件，建立人工文件參考轉移描述。其概念可形式化表示如式 \eqref{eq:reference_transition_text_definition} 所示：
+\begin{equation}
+\label{eq:reference_transition_text_definition}
+\begin{aligned}
+T^{\mathrm{ref}}_t = g(
+&instruction,\\
+&gold\_path,\\
+&Step,\\
+&api\_step,\\
+&dependency\_bindings\_content,\\
+&success\_condition,\\
+&acceptable\_failure\_codes)
+\end{aligned}
+\end{equation}
+\text 其中，$T^{\mathrm{ref}}_t$表示第$t$步之人工文件參考轉移描述；函數$g(\cdot)$表示將人工文件欄位轉換為文字化參考描述之組合函數。表 \ref{tab:manual_doc_fields_meteor} 整理本研究用於建立$S_{METEOR}(t)$參考描述之主要欄位與範例資料。
+
+\begin{table}[H]
+\centering
+\caption{人工文件欄位與METEOR參考描述來源範例}
+\label{tab:manual_doc_fields_meteor}
+\scriptsize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{3.0cm} >{\raggedright\arraybackslash}p{3.8cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{欄位名稱} & \textbf{於METEOR中的用途} & \textbf{範例欄位資料} \\
+\midrule
+\path{task_id} & 識別任務與對應步驟集合 & \path{tmdb_001} \\
+\path{instruction} & 提供任務語意目標 & \path{give me the number of movies directed by Sofia Coppola} \\
+\path{gold_path} & 提供預期操作順序 & \path{Step 1: GET /search/person -> Step 2: GET /person/{person_id}/movie_credits} \\
+\path{Step} & 指定目前步驟 & \path{Step 1} \\
+\path{api_step} & 指定目前應執行之API操作 & \path{GET /search/person} \\
+\path{output_bindings_content} & 定義前一步應抽取之輸出欄位 & \path{$.results[0].id as person_id} \\
+\path{dependency_bindings_content} & 定義跨步驟依賴名稱 & \path{person_id} \\
+\path{success_condition} & 提供成功判定條件 & \path{all required steps executed and passed} \\
+\path{oracle_actions_1_regenerate_data} & 提供驗證錯誤之建議後續處置 & \path{[400, 422]} \\
+\path{oracle_actions_2_resolve_resource} & 提供資源錯誤之建議後續處置 & \path{[404]} \\
+\path{acceptable_failure_codes} & 提供可接受失敗條件 & \path{[401, 403]} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\text 以範例\texttt{tmdb\_001}第一步為例，人工文件明確指出任務指令為搜尋特定導演，預期gold path為先執行API，再以輸出的\path{person_id}執行第二步\path{GET /person/{person_id}/movie_credits}。因此，當第$t$步之實際狀態轉移描述與此人工文件參考描述越接近時，$S_{METEOR}(t)$越高；反之，若執行結果偏離預期步驟、未正確綁定依賴，或未滿足人工文件所定義之成功條件，則其分數下降。
+\begin{equation}
+\label{eq:semantic_delta_definition}
+\Delta_{\text{semantic}}(t)=S_{\text{transition}}(t+1)-S_{\text{transition}}(t)
+\end{equation}
+
+$\Delta_{\text{semantic}}(t)$表示某一工作流程行動執行後，狀態在語意品質上的改善或惡化程度。
+若行動後之request較完整、依賴綁定較正確，或與人工文件之轉移語意對齊程度更高，則$\Delta_{\text{semantic}}(t)$為正值；反之，若行動後之依賴關係仍缺失、請求品質下降，或狀態轉移更偏離預期流程，則$\Delta_{\text{semantic}}(t)$為負值。
+
+\text 除語意改善量外，本研究亦根據執行結果之語意狀態群組（Status Group）給定基礎狀態獎勵。系統不直接以原始HTTP status code比較，而是先將執行結果語意化分類為success、invalid\_auth、insufficient\_permission、not\_found、validation\_error、rate\_limit、server\_error或environment\_error等群組，再依據狀態轉移方向給定$R_{\text{status}}$。其中，由non-success轉為success給予較高正向獎勵；由unknown或environment\_error轉為較可診斷之非環境錯誤狀態給予中度正向獎勵；重複採取相同行動且仍停留於相同失敗狀態，則給予負向獎勵；若由success退化為non-success，則給予較大負向獎勵。
+
+\text 綜合基礎狀態獎勵與語意轉移改善量後，第$t$步總獎勵定義如式 \eqref{eq:total_reward_definition} 所示：
+\begin{equation}
+\label{eq:total_reward_definition}
+R_t=
+\operatorname{clip}
+\Big(
+R_{\text{status}}+\Delta_{\text{semantic}}(t),
+-1,1
+\Big)
+\end{equation}
+
+\text 其中，$R_t$表示第$t$步工作流程決策之即時總獎勵；$R_{\text{status}}$表示由狀態群組轉移方向所決定之基礎狀態獎勵；$\Delta_{\text{semantic}}(t)$表示語意轉移品質之差分；$\operatorname{clip}(\cdot,-1,1)$表示將總獎勵限制於區間$[-1,1]$，避免極端值對離線Q值估計造成過度放大影響。
+
+\text 從方法意義而言，$R_{\text{status}}$負責評估狀態轉移之整體方向是否改善，例如失敗是否轉為成功、未知錯誤是否轉為可診斷錯誤，或是否反而退化為更差之失敗狀態；$\Delta_{\text{semantic}}(t)$則負責衡量細部品質是否提升，例如request是否更符合schema、dependency binding是否更正確，以及狀態描述是否更貼近人工文件所定義之預期流程。因此，本研究之reward不只是獎勵「某一步API是否成功」，而是獎勵「某一工作流程行動是否讓測試流程朝向可完成、可綁定且可對齊人工文件之方向前進」。
+
+\text 本研究之策略最佳化仍以折扣累積獎勵為目標，其目標函數可表示如式 \eqref{eq:policy_optimization_objective_reward} 所示：
+\begin{equation}
+\label{eq:policy_optimization_objective_reward}
+\max_{\pi}\;
+\mathbb{E}
+\left[
+\sum_{t=0}^{T}\gamma^t R_t
+\right]
+\end{equation}
+
+\text 其中，$\gamma$為折扣因子，用以控制未來獎勵相對於目前決策之重要程度。當$\gamma$較高時，策略將更重視工作流程長期延續與最終完成性；當$\gamma$較低時，策略則較偏向重視短期狀態改善。
+\text 需特別說明者為，本研究目前之reward設計尚未正式納入execution time cost、token cost或backend pressure等成本項，因此其本質仍屬以workflow correctness、continuity與manual-doc alignment為主之獎勵設計，而非成本敏感式獎勵函數。
+\text 為說明上述獎勵計算如何反映於實際執行紀錄，本研究以v5輸出紀錄為例。該檔案保存每一筆測試案例於v5決策模式下之HTTP結果、語意判定、最終判定、轉移分數與決策中繼資料。其核心資料結構可抽象表示如式 \eqref{eq:v5_result_record_definition} 所示：
+\begin{equation}
+\label{eq:v5_result_record_definition}
+\begin{aligned}
+ResultRecord = (&\textit{strict\_http\_pass},\;
+\textit{semantic\_manual\_verdict},\;
+\textit{final\_verdict},\\
+&\textit{manual\_doc\_match\_score},\;
+\textit{transition\_score}_{t},\;
+\textit{transition\_score}_{t+1},\\
+&\textit{reward\_total},\;
+\textit{decision\_metadata})
+\end{aligned}
+\end{equation}
+
+\text 其中，\path{strict_http_pass} 表示是否滿足嚴格HTTP成功條件。\path{semantic_manual_verdict} 表示根據人工文件語意規則所得之判定，\path{final_verdict} 表示最終任務層級判定，\path{manual_doc_match_score} 表示當前結果與人工文件描述之對齊程度。
+\text 另，\path{transition_score_t} 與 \path{transition_score_t1} 分別表示行動前後之狀態轉移品質，\path{reward_total} 表示該次狀態轉移之總獎勵；\path{decision_metadata} 則記錄v5所選擇之標準化動作、執行期動作與對應特徵狀態。
+
+\text 表 \ref{tab:v5_result_record_example} 整理 \texttt{v5\_task\_results.json} 中一筆輸出紀錄之主要欄位值。
+
+\begin{table}[H]
+\centering
+\caption{v5輸出紀錄範例}
+\label{tab:v5_result_record_example}
+\scriptsize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash}p{4.2cm} >{\raggedright\arraybackslash}X}
+\toprule
+\textbf{欄位} & \textbf{範例值} \\
+\midrule
+\path{test_case_id} & \path{V12_0001} \\
+\path{status} & \path{passed} \\
+\path{strict_http_pass} & \path{true} \\
+\path{semantic_manual_verdict} & \path{strict_pass} \\
+\path{final_verdict} & \path{pass} \\
+\path{final_verdict_reason} & \path{Observed outcome satisfied the strict HTTP expectation.} \\
+\path{manual_doc_match_score} & \path{0.24320551411246344} \\
+\path{transition_score_t} & \path{0.39773009950248756} \\
+\path{transition_score_t1} & \path{0.772961654233739} \\
+\path{reward_total} & \path{1.0} \\
+\path{decision_metadata.canonical_action} & \path{report} \\
+\path{decision_metadata.runtime_action} & \path{continue_to_report} \\
+\path{decision_metadata.policy_version} & \path{v5} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\text 若以原始JSON片段觀察，其內容可表示如下：
+
+\begin{verbatim}
+{
+  "test_case_id": "V12_0001",
+  "status": "passed",
+  "strict_http_pass": true,
+  "semantic_manual_verdict": "strict_pass",
+  "final_verdict": "pass",
+  "manual_doc_match_score": 0.24320551411246344,
+  "transition_score_t": 0.39773009950248756,
+  "transition_score_t1": 0.772961654233739,
+  "reward_total": 1.0,
+  "decision_metadata": {
+    "policy_version": "v5",
+    "canonical_action": "report",
+    "runtime_action": "continue_to_report",
+    "adapter_kind": "offline_q_runtime"
+  }
+}
+\end{verbatim}
+
+\text 此例顯示，v5不僅輸出最終任務判定，亦同步保存狀態轉移分數、人工文件對齊分數與決策中繼資料，以作為決策軌跡、語意判定與獎勵值的實際範例，使後續Offline-Q資料集建構可直接使用\texttt{reward\_total}作為$r_t$，並以\texttt{decision\_metadata}追蹤該次工作流程行動之決策來源。
+\text 獎勵設計的主要目的在於為工作流程恢復與狀態延續提供可學習之回饋訊號。本研究參考程序獎勵模型（Process Reward Modeling, PRM）之概念，將獎勵評估單位由最終測試結果延伸至每一步狀態轉移，使系統能評估中間決策步驟是否使測試流程朝向可完成、可綁定且符合人工文件之方向前進。本研究借用「逐步評估決策品質」之核心概念，應用於工作流程決策之轉移獎勵計算，因此以「PRM導向獎勵設計」稱之，以區別於標準outcome-based獎勵。
+\text 換言之，此獎勵設計在本研究中首先服務於工作流程決策問題之形式化——使每一步決策具備可計算之回饋訊號；其次才是支援 Offline-Q之策略訓練——提供可用於 Q 值估計之轉移獎勵。在當前實驗規模下，獎勵設計之有效性應理解為「提供形式化所需之訊號結構」。
 \end{ZhChapter}

@@ -1,6 +1,8 @@
 \documentclass[12pt, a4paper]{ntut-report}
 \usepackage[dvips,xetex]{graphicx}
 \usepackage{ifpdf,mla}% <-- mla.sty requires ifpdf.sty, but (perversely) doesn't load it
+\usepackage{url}
+\usepackage{xurl} % 允許網址在任何地方斷行
 \usepackage{fontspec}
 \usepackage{geometry}
 \usepackage{lipsum}
@@ -12,13 +14,24 @@
 \usepackage{hyperref}
 \usepackage{zhnumber}
 \usepackage{titlesec}
-\usepackage{amsmath}
-\usepackage[backend=bibtex,sorting=none]{biblatex}
-\usepackage{tabularx}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsmath}  % 建議一併載入，提供更強大的數學公式支援
+\usepackage[backend=biber,sorting=none]{biblatex}
+\usepackage{tabularx} % 自動調整欄寬
 \usepackage{booktabs} % 用於美化表格線條
+\usepackage{longtable} % 支援跨頁表格
+\usepackage{ltablex}    % 結合 longtable 與 tabularx
 \usepackage{ragged2e} % 用於更好的文字對齊
+\usepackage[table]{xcolor} % 這是最關鍵的
+\usepackage{xltabular}        % 支援跨頁 (longtable) 且可自訂寬度 (tabularx)
 \usepackage{csquotes}
 \usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algorithmic} % 注意：這裡使用 algorithmic 套件
+\usepackage{amsmath}
+\renewcommand{\algorithmicrequire}{\textbf{Require:}}
+\renewcommand{\algorithmicensure}{\textbf{Ensure:}}
 \MakeAutoQuote{“}{”}
 \MakeOuterQuote{"}
 
@@ -41,7 +54,7 @@
 % 封面、不用浮水印 Cover without a watermark
 \include{page/01_titlepage.tex}
 % 留白頁、不用浮水印 Blank page without a watermark
-\include{page/00_blankpage.tex}
+% \include{page/00_blankpage.tex}
 
 % 新增浮水印 Add Watermarks
 \CenterWallPaper{.64}{ntut-logo.png}
@@ -50,7 +63,7 @@
 \input{page/01_titlepage.tex}
 % 「學位論文口試委員會審定書」掃描檔，請檢附完整簽名之審定書掃描檔
 % Please add "Oral Defense Committee Signature Form" with complete signatures.
-\includepdf[pages=-]{static-page/signpage.pdf}
+% \includepdf[pages=-]{static-page/signpage.pdf}
 
 \pagenumbering{roman}
 
@@ -60,7 +73,7 @@
 % 摘要頁（英文）Abstract (English)
 \include{page/03_abstract-en.tex}
 % 鳴謝 Acknowledgements
-\include{page/04_thanks.tex}
+% \include{page/04_thanks.tex}
 % 目錄、表目錄與圖目錄 Table of Contents, List of tables, List of figures
 \include{page/05_table-of-content.tex}
  
@@ -73,7 +86,9 @@
 % 章節三 Chapter 3
 \include{chapter/CH03_methodology.tex}
 % 新增你自己的章節... Add chapters here
+\include{chapter/CH04_implementation.tex}
 
+\include{chapter/CH05_conclusion.tex}
 % 參考文獻，請在段落上隨意註解，你同時需要 reference.bib
 \include{page/99_reference.tex}
 
