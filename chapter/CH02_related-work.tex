@@ -6,39 +6,39 @@
 
 \text 在傳統軟體開發生命週期中，系統測試（System Testing）負責驗證完全整合後的產品是否符合規格要求，是品質保證（Quality Assurance, QA）對照初期需求進行全面驗收的重要階段。然而，隨著對開發速度與彈性的需求不斷提升，特別是在敏捷（Agile）方法興起後，耗時且成本高昂的測試流程（例如大規模回歸測試）逐漸被視為難以持續。
 \text 因此，系統測試逐漸從傳統的後置活動，轉變為嵌入短週期開發衝刺（Sprint）中的持續性驗證與確認（Continuous V\&V）流程。這一轉變促使自動化測試（Automated Testing）在軟體開發中迅速普及，品質保證團隊開始撰寫可重複執行的測試腳本，以確保功能在頻繁修改下仍保持正確性。
-\text 隨著持續整合與持續部署（Continuous Integration / Continuous Deployment, CI/CD）的導入，快速部署與持續測試（Continuous Testing）進一步成為現代開發流程中的核心實踐，自動化的系統測試與整合測試亦被內嵌於 CI/CD 管線（Pipeline）中，成為穩定交付品質的重要條件。\cite{TestingSoftwareSystems}
-\text 在此脈絡下，自動化測試逐漸扮演開發流程中的品質守門員角色，使團隊得以在高頻率版本釋出條件下維持基本品質保證能力。系統測試通常採用黑箱測試（Black-box Testing）方法，不要求測試者理解內部程式邏輯，而是透過檢驗輸入與預期輸出之間的一致性來驗證系統行為。\cite{Nguyen2024KAT}\cite{OracleProblemSurvey}於現代RESTful API的情境中，多數方法從API規範（OpenAPI Specification, OAS）推導測試案例。整體而言，系統測試主要涵蓋兩大類別：
+\text 隨著持續整合與持續部署（Continuous Integration / Continuous Deployment, CI/CD）的導入，快速部署與持續測試（Continuous Testing）進一步成為現代開發流程中的核心實踐，自動化的系統測試與整合測試亦被內嵌於 CI/CD 管線（Pipeline）中，成為穩定交付品質的重要條件 \parencite{TestingSoftwareSystems}。
+\text 在此脈絡下，自動化測試逐漸扮演開發流程中的品質守門員角色，使團隊得以在高頻率版本釋出條件下維持基本品質保證能力。系統測試通常採用黑箱測試（Black-box Testing）方法，不要求測試者理解內部程式邏輯，而是透過檢驗輸入與預期輸出之間的一致性來驗證系統行為 \parencite{Nguyen2024KAT, OracleProblemSurvey}。於現代RESTful API的情境中，多數方法從API規範（OpenAPI Specification, OAS）推導測試案例。整體而言，系統測試主要涵蓋兩大類別：
 \begin{enumerate}
-    \item 功能測試（Functional Testing）：檢驗系統是否如需求所述運作，確保功能性（Functional suitability）符合明示或隱含的需求。\cite{TestingSoftwareSystems}
+    \item 功能測試（Functional Testing）：檢驗系統是否如需求所述運作，確保功能性（Functional suitability）符合明示或隱含的需求 \parencite{TestingSoftwareSystems}。
     \item 非功能測試（Non-Functional Testing, NFT）：評估系統執行功能的品質，包括效能效率（Performance efficiency）、安全性（Security）、可用性（Usability）、可維護性（Maintainability）等面向。
 \end{enumerate}
 
-\text 儘管自動化測試在 CI/CD 流程中已廣泛涵蓋單元測試、整合測試與部分非功能測試，黑箱系統測試在實務上仍存在若干結構性限制。其中特別突出的問題之一為測試預言機（Test Oracle）不足，使得測試結果是否符合預期常難以以完全自動化方式判定\cite{Anonymous2025GenAIRoles}\cite{Golmohammadi2024Testing}\cite{Navarro2026Automatic}
-\text 傳統自動化測試多依賴API回應（例如HTTP狀態碼）或API規範（如 OAS）的不一致性偵測來判定結果，但這不足以支撐端到端（End-to-end）的正確性驗證。\cite{Alonso2023ARTE}\cite{OracleProblemSurvey}
-\text 此外，在複雜的RESTful API系統中，既有方法難以處理操作間的複雜依賴性（Inter-operation Dependencies）和參數間依賴性（Inter-parameter Dependencies, IPDs）\cite{Nguyen2024KAT}\cite{Kim2025LlamaRestTest}，使得系統測試雖可自動產生大量請求，卻未必能有效形成具業務意義的測試流程。尤其在微服務架構下，雖然開發獨立性與部署彈性有所提升，但系統也同時呈現低可觀察性與行為不穩定性。
-\text 微服務架構雖然增強了開發的獨立性與部署的彈性，但也帶來了低可觀察性（low observability）系統行為不穩定性。現有的微服務描述語言（如 OpenAPI Specification, OAS）多聚焦於單一微服務的API描述，卻缺乏對特定業務情境下行為預期或跨服務呼叫依賴關係的全面描述，這使得確保規格與實作之間的一致性（Conformance）成為一大挑戰。\cite{Sun2024Detecting}
+\text 儘管自動化測試在 CI/CD 流程中已廣泛涵蓋單元測試、整合測試與部分非功能測試，黑箱系統測試在實務上仍存在若干結構性限制。其中特別突出的問題之一為測試預言機（Test Oracle）不足，使得測試結果是否符合預期常難以以完全自動化方式判定\parencite{Anonymous2025GenAIRoles, Golmohammadi2024Testing, Navarro2026Automatic}。
+\text 傳統自動化測試多依賴API回應（例如HTTP狀態碼）或API規範（如 OAS）的不一致性偵測來判定結果，但這不足以支撐端到端（End-to-end）的正確性驗證 \parencite{Alonso2023ARTE, OracleProblemSurvey}。
+\text 此外，在複雜的RESTful API系統中，既有方法難以處理操作間的複雜依賴性（Inter-operation Dependencies）和參數間依賴性（Inter-parameter Dependencies, IPDs）\parencite{Nguyen2024KAT, Kim2025LlamaRestTest}，使得系統測試雖可自動產生大量請求，卻未必能有效形成具業務意義的測試流程。尤其在微服務架構下，雖然開發獨立性與部署彈性有所提升，但系統也同時呈現低可觀察性（low observability）與行為不穩定性。
+\text 現有的微服務描述語言（如 OpenAPI Specification, OAS）多聚焦於單一微服務的API描述，卻缺乏對特定業務情境下行為預期或跨服務呼叫依賴關係的全面描述，這使得確保規格與實作之間的一致性（Conformance）成為一大挑戰 \parencite{Sun2024Detecting}。
 
 \text 綜合相關研究可知，系統測試已由傳統後置驗證活動，轉變為持續交付環境下不可或缺的自動化品質機制；然而，現有黑箱自動化方法在語意驗證、跨操作依賴推論與端對端流程驗證方面仍存在明顯限制。此一缺口亦說明，若要支援 API 驅動之現代軟體系統，系統測試不僅需要更高程度的自動化，亦需要能同時處理規格理解、流程相依與執行階段決策之整合性方法，這也構成本研究後續文獻探討與方法設計之基礎。
 
 \section{RESTful API自動化測試技術與侷限性}
-\text 隨著軟體即服務（Software-as-a-Service, SaaS）成為主流，RESTful API是可促使不同軟體系統進行資料交換與功能呼叫的標準介面，實現系統間的溝通與整合，已成為現代軟體架構中的核心互動介面，其品質驗證的重要性亦日益提高。\cite{Wang2020AutomaticGeneration}\cite{yu2025rag}然而，當開發流程朝向敏捷（Agile）與持續整合及持續部署（Continuous Integration / Continuous Deployment, CI/CD）的短週期模式發展時，自動化測試面臨的挑戰也隨之增加。這些挑戰不僅存在於測試腳本生成階段，亦延伸至實際執行與結果判定階段，反映出現行品質保證機制與開發節奏之間仍存在明顯落差。
-\text 業界長期面臨的重要瓶頸之一，在於測試腳本與測試預言機（Test Oracle）難以完全自動化。尤其在缺乏形式化規格、完整斷言（Assertion）或可機器判定之輸出條件時，系統輸出是否屬於可接受之正確行為，往往難以透過自動化方式判斷。\cite{OracleProblemSurvey}對於複雜功能之端對端（End-to-End）正確性驗證，許多 CI/CD 流程仍需依賴人工檢查，形成持續性的維護成本。\cite{Wang2020AutomaticGeneration}
+\text 隨著軟體即服務（Software-as-a-Service, SaaS）成為主流，RESTful API是可促使不同軟體系統進行資料交換與功能呼叫的標準介面，實現系統間的溝通與整合，已成為現代軟體架構中的核心互動介面，其品質驗證的重要性亦日益提高 \parencite{Wang2020AutomaticGeneration, yu2025rag}。然而，當開發流程朝向敏捷（Agile）與持續整合及持續部署（Continuous Integration / Continuous Deployment, CI/CD）的短週期模式發展時，自動化測試面臨的挑戰也隨之增加。這些挑戰不僅存在於測試腳本生成階段，亦延伸至實際執行與結果判定階段，反映出現行品質保證機制與開發節奏之間仍存在明顯落差。
+\text 業界長期面臨的重要瓶頸之一，在於測試腳本與測試預言機（Test Oracle）難以完全自動化。尤其在缺乏形式化規格、完整斷言（Assertion）或可機器判定之輸出條件時，系統輸出是否屬於可接受之正確行為，往往難以透過自動化方式判斷 \parencite{OracleProblemSurvey}。對於複雜功能之端對端（End-to-End）正確性驗證，許多 CI/CD 流程仍需依賴人工檢查，形成持續性的維護成本 \parencite{Wang2020AutomaticGeneration}。
 
 \text 在腳本撰寫階段，主要困難來自如何由非結構化需求生成可執行之測試案例：
 \begin{enumerate}
-    \item 傳統自動化方法往往假設系統需求可由統一塑模語言（Unified Modeling Language, UML）行為模型，如活動圖或循序圖，加以表達。然而在真實工業環境中，要建立足夠精確且可支撐測試生成之行為模型，其規格化成本通常過高，難以廣泛採用。\cite{Wang2020AutomaticGeneration}
-    \item 多數需求規格仍以自然語言（Natural Language, NL）撰寫使用案例規範（use case specifications）。若需由此類文件手動萃取執行場景與輸入資料，不僅成本高昂且容易出錯；即便使用自然語言處理技術進行測試模型生成，也常需大量人工修補，導致可擴展性不足。\cite{Wang2020AutomaticGeneration}
+    \item 傳統自動化方法往往假設系統需求可由統一塑模語言（Unified Modeling Language, UML）行為模型，如活動圖或循序圖，加以表達。然而在真實工業環境中，要建立足夠精確且可支撐測試生成之行為模型，其規格化成本通常過高，難以廣泛採用 \parencite{Wang2020AutomaticGeneration}。
+    \item 多數需求規格仍以自然語言（Natural Language, NL）撰寫使用案例規範（use case specifications）。若需由此類文件手動萃取執行場景與輸入資料，不僅成本高昂且容易出錯；即便使用自然語言處理技術進行測試模型生成，也常需大量人工修補，導致可擴展性不足 \parencite{Wang2020AutomaticGeneration}。
 \end{enumerate}
 
 \text 即使測試腳本已生成完成，在執行階段仍須面對現代 RESTful API 所帶來的多重困難：
 \begin{enumerate}
-    \item 同時確保輸入資料具備語法正確性（Syntactic Validity）與語意一致性（Semantic Coherence）仍屬具挑戰性的問題。RESTLess 指出，許多模糊測試工具依賴字典或隨機產生參數值，使輸入缺乏語義真實性，導致大量請求在進入系統前即被阻擋。此類無效請求不僅降低執行效率，也浪費測試資源。\cite{Zheng2024RESTLess}
-    \item 傳統自動化測試方法亦難以有效處理 RESTful API 的跨操作依賴與跨參數依賴。當欄位命名、資源關聯或參數語意稍有差異時，啟發式方法即可能誤判或忽略依賴關係；若改以人工補充依賴資訊，則將造成測試工程師額外的維護負擔。\cite{Nguyen2024KAT}
-    \item 由於無法精確處理複雜依賴關係，多數工具傾向生成較短且變化有限的測試序列，導致難以觸發隱藏於複雜操作組合下的深層狀態與錯誤，進而限制測試成效。\cite{Zheng2024RESTLess}\cite{Meunier2022Black}
+    \item 同時確保輸入資料具備語法正確性（Syntactic Validity）與語意一致性（Semantic Coherence）仍屬具挑戰性的問題。RESTLess 指出，許多模糊測試工具依賴字典或隨機產生參數值，使輸入缺乏語義真實性，導致大量請求在進入系統前即被阻擋。此類無效請求不僅降低執行效率，也浪費測試資源 \parencite{Zheng2024RESTLess}。
+    \item 傳統自動化測試方法亦難以有效處理 RESTful API 的跨操作依賴與跨參數依賴。當欄位命名、資源關聯或參數語意稍有差異時，啟發式方法即可能誤判或忽略依賴關係；若改以人工補充依賴資訊，則將造成測試工程師額外的維護負擔 \parencite{Nguyen2024KAT}。
+    \item 由於無法精確處理複雜依賴關係，多數工具傾向生成較短且變化有限的測試序列，導致難以觸發隱藏於複雜操作組合下的深層狀態與錯誤，進而限制測試成效 \parencite{Zheng2024RESTLess, Meunier2022Black}。
 \end{enumerate}
 
-\text 近年來，大型語言模型（Large Language Models, LLMs）逐漸被應用於測試案例準備、測試預言機輔助生成、測試資料生成與依賴關係辨識等任務，展現出顯著潛力。\cite{Wang2020AutomaticGeneration}\cite{Navarro2026Automatic}相關研究指出，大型語言模型不僅可協助生成測試腳本、約束驗證腳本、測試案例與測試資料，亦可透過自然語言理解能力辨識較複雜的依賴關係。\cite{Nguyen2024KAT}此外，大型語言模型亦可產生較具語義相關性與真實性的測試輸入值，對提升 RESTful API 自動化測試之覆蓋能力，以及降低隨機輸入所造成之無效請求，具有明顯幫助。\cite{Kim2025LlamaRestTest}
-\text 另一方面，結合外部工具之大型語言模型方法，也使測試流程中的推理與驗證能力得以提升。例如透過Python直譯器或外部工具協助模型逐步進行資料處理與結果驗證，可提高測試案例之準確性，並減少傳統腳本維護的負擔。\cite{Wang2020AutomaticGeneration}然而，現有方法多半仍聚焦於測試案例生成、測試資料準備或局部依賴推論，對於整體測試執行流程中的動態控制與後續決策支援仍相對不足。
+\text 近年來，大型語言模型（Large Language Models, LLMs）逐漸被應用於測試案例準備、測試預言機輔助生成、測試資料生成與依賴關係辨識等任務，展現出顯著潛力 \parencite{Wang2020AutomaticGeneration, Navarro2026Automatic}。相關研究指出，大型語言模型不僅可協助生成測試腳本、約束驗證腳本、測試案例與測試資料，亦可透過自然語言理解能力辨識較複雜的依賴關係 \parencite{Nguyen2024KAT}。此外，大型語言模型亦可產生較具語義相關性與真實性的測試輸入值，對提升 RESTful API 自動化測試之覆蓋能力，以及降低隨機輸入所造成之無效請求，具有明顯幫助 \parencite{Kim2025LlamaRestTest}。
+\text 另一方面，結合外部工具之大型語言模型方法，也使測試流程中的推理與驗證能力得以提升。例如透過Python直譯器或外部工具協助模型逐步進行資料處理與結果驗證，可提高測試案例之準確性，並減少傳統腳本維護的負擔 \parencite{Wang2020AutomaticGeneration}。然而，現有方法多半仍聚焦於測試案例生成、測試資料準備或局部依賴推論，對於整體測試執行流程中的動態控制與後續決策支援仍相對不足。
 \text 因此，現有 RESTful API 自動化測試技術雖已在規格解析、腳本生成與語義輸入生成方面取得進展，但在真實執行環境中，仍面臨語意一致性不足、依賴推論不完整、端對端流程可達性有限，以及執行階段缺乏有效決策機制等問題。此一現象顯示，研究焦點不應僅侷限於測試資料或腳本生成本身，亦應進一步處理測試流程在動態 API 生態中的持續執行與決策問題，這亦為本研究後續探討之重要切入點。
 
 \begin{table}[htbp]
@@ -51,14 +51,14 @@
 \toprule
 \textbf{分類} & \textbf{代表文獻} & \textbf{可直接支持之主張} & \textbf{與本研究之關係} & \textbf{定位} \\
 \midrule
-REST API Testing & RESTler\cite{Atlidakis2019RESTler}, EvoMaster\cite{Arcuri2021Automated} & 有狀態或規格導向之RESTful API測試、錯誤觸發與覆蓋提升 & 可作為現有RESTful API測試基線與侷限比較 & 直接支持 \\
-OpenAPI Testing & RESTTestGen\cite{Corradini2022RestTestGen,Viglianisi2020RESTTESTGEN} & 由OpenAPI規格自動生成測試案例與請求 & 直接支持規格驅動測試生成之研究脈絡 & 直接支持 \\
-LLM API Testing & RESTLess\cite{Zheng2024RESTLess}, KAT\cite{Nguyen2024KAT}, LlamaRestTest\cite{Kim2025LlamaRestTest} & 語義輸入增強、依賴推論、回應導向修正 & 直接支撐本研究之前置能力來源，但未直接處理執行後工作流程決策 & 直接支持 \\
-Multi-Agent & AutoGen\cite{Wu2023AutoGen}, Bandi\cite{Bandi2025Rise} & 多代理分工、協作與角色化任務處理 & 支持本研究採多代理架構之合理性 & 直接支持 \\
-Agentic Workflow & RestGPT\cite{Song2023RestGPT}, Borghoff\cite{Borghoff2025Beyond} & 多步驟任務規劃、流程協調、回應導向後續行動 & 可作為流程編排與多步驟執行之借鏡，但非API測試workflow decision直接證據 & 借鏡 \\
-Offline RL & \cite{rao2022foundations} & 序列決策、狀態轉移與回饋學習之理論基礎 & 支持本研究以離線資料學習workflow decision policy & 直接支持 \\
-MCP & \cite{Ehtesham2025SurveyMCPACPA2AANP,Hou2025MCP} & 大型語言模型與工具、資源及上下文之標準化整合 & 支持本研究之工具調用與上下文存取機制設計 & 直接支持 \\
-A2A & \cite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & 代理間任務委派、能力描述與狀態交換 & 支持本研究之代理協作與跨代理狀態交換設計 & 直接支持 \\
+REST API Testing & RESTler\parencite{Atlidakis2019RESTler}, EvoMaster\parencite{Arcuri2021Automated} & 有狀態或規格導向之RESTful API測試、錯誤觸發與覆蓋提升 & 可作為現有RESTful API測試基線與侷限比較 & 直接支持 \\
+OpenAPI Testing & RESTTestGen\parencite{Corradini2022RestTestGen,Viglianisi2020RESTTESTGEN} & 由OpenAPI規格自動生成測試案例與請求 & 直接支持規格驅動測試生成之研究脈絡 & 直接支持 \\
+LLM API Testing & RESTLess\parencite{Zheng2024RESTLess}, KAT\parencite{Nguyen2024KAT}, LlamaRestTest\parencite{Kim2025LlamaRestTest} & 語義輸入增強、依賴推論、回應導向修正 & 直接支撐本研究之前置能力來源，但未直接處理執行後工作流程決策 & 直接支持 \\
+Multi-Agent & AutoGen\parencite{Wu2023AutoGen}, Bandi\parencite{Bandi2025Rise} & 多代理分工、協作與角色化任務處理 & 支持本研究採多代理架構之合理性 & 直接支持 \\
+Agentic Workflow & RestGPT\parencite{Song2023RestGPT}, Borghoff\parencite{Borghoff2025Beyond} & 多步驟任務規劃、流程協調、回應導向後續行動 & 可作為流程編排與多步驟執行之借鏡，但非API測試workflow decision直接證據 & 借鏡 \\
+Offline RL & \parencite{rao2022foundations} & 序列決策、狀態轉移與回饋學習之理論基礎 & 支持本研究以離線資料學習workflow decision policy & 直接支持 \\
+MCP & \parencite{Ehtesham2025SurveyMCPACPA2AANP,Hou2025MCP} & 大型語言模型與工具、資源及上下文之標準化整合 & 支持本研究之工具調用與上下文存取機制設計 & 直接支持 \\
+A2A & \parencite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & 代理間任務委派、能力描述與狀態交換 & 支持本研究之代理協作與跨代理狀態交換設計 & 直接支持 \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -66,19 +66,19 @@ A2A & \cite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & �
 \text 表 \ref{tab:related_work_positioning} 整理本研究所引用文獻之定位。整體而言，RESTler、RESTTestGen、EvoMaster、RESTLess、KAT 與 LlamaRestTest 可直接支撐 RESTful API 測試、OpenAPI 規格導向測試、語義輸入增強與依賴推論等研究脈絡；RestGPT、代理式工作流程與部分強化學習文獻則主要作為多步驟流程規劃與序列決策建模之借鏡，而非直接處理 API 測試執行後工作流程決策之研究。
 
 \section{LLM 驅動的RESTful API自動化測試核心方法}
-\text 大型語言模型（Large Language Models, LLMs）驅動的自動化測試方法，近年已逐漸成為改善 RESTful API 測試限制的重要方向。相關研究顯示，此類方法主要可由三個核心層面提升既有自動化測試流程之能力，分別為依賴性解析與操作序列推導、語義測試輸入生成，以及結合外部工具之執行輔助與驗證強化。\cite{Nguyen2024KAT}
+\text 大型語言模型（Large Language Models, LLMs）驅動的自動化測試方法，近年已逐漸成為改善 RESTful API 測試限制的重要方向。相關研究顯示，此類方法主要可由三個核心層面提升既有自動化測試流程之能力，分別為依賴性解析與操作序列推導、語義測試輸入生成，以及結合外部工具之執行輔助與驗證強化 \parencite{Nguyen2024KAT}。
 
 \begin{enumerate}
-    \item \text 依賴性解析與操作序列推導方面，大型語言模型之自然語言理解能力，使其得以處理傳統啟發式方法較難捕捉之複雜依賴關係。以 KAT 為代表的方法，透過模型解析 OpenAPI 規格中的自然語言描述，系統性辨識操作間依賴性（Inter-operation Dependencies）與參數間依賴性（Inter-parameter Dependencies, IPDs），並進一步建構操作依賴圖（Operation Dependency Graph, ODG），以支援較符合業務邏輯之測試序列生成。\cite{Nguyen2024KAT}
+    \item \text 依賴性解析與操作序列推導方面，大型語言模型之自然語言理解能力，使其得以處理傳統啟發式方法較難捕捉之複雜依賴關係。以 KAT 為代表的方法，透過模型解析 OpenAPI 規格中的自然語言描述，系統性辨識操作間依賴性（Inter-operation Dependencies）與參數間依賴性（Inter-parameter Dependencies, IPDs），並進一步建構操作依賴圖（Operation Dependency Graph, ODG），以支援較符合業務邏輯之測試序列生成 \parencite{Nguyen2024KAT}。
     
-    \item \text 在語義測試輸入生成方面，傳統方法的一項主要限制，在於缺乏具真實意義且語義有效之測試輸入。\cite{Alonso2023ARTE}大型語言模型可根據參數名稱、欄位描述與上下文語意產生較具真實性的輸入值，從而提升有效請求比例並減少無效請求。\cite{Anonymous2023LLMGenerators}\cite{Alonso2023ARTE}代表性研究包括 ARTE、RESTLess 與 LlamaRestTest。ARTE 結合知識庫與自然語言處理技術，由 API 規範中抽取可用之測試輸入；RESTLess 則利用大型語言模型進行資料增強，建立高語義參數值資料集 RTSet，以補充 OAS 中不足之輸入範例；LlamaRestTest 進一步採用模型微調，使模型更聚焦於特定領域參數值之生成。\cite{Alonso2023ARTE}\cite{Zheng2024RESTLess}\cite{Kim2025LlamaRestTest}
+    \item \text 在語義測試輸入生成方面，傳統方法的一項主要限制，在於缺乏具真實意義且語義有效之測試輸入 \parencite{Alonso2023ARTE}。大型語言模型可根據參數名稱、欄位描述與上下文語意產生較具真實性的輸入值，從而提升有效請求比例並減少無效請求 \parencite{Anonymous2023LLMGenerators, Alonso2023ARTE}。代表性研究包括 ARTE、RESTLess 與 LlamaRestTest。ARTE 結合知識庫與自然語言處理技術，由 API 規範中抽取可用之測試輸入；RESTLess 則利用大型語言模型進行資料增強，建立高語義參數值資料集 RTSet，以補充 OAS 中不足之輸入範例；LlamaRestTest 進一步採用模型微調，使模型更聚焦於特定領域參數值之生成 \parencite{Alonso2023ARTE, Zheng2024RESTLess, Kim2025LlamaRestTest}。
     
-    \item \text 在執行輔助與驗證強化方面，大型語言模型亦可結合外部工具或執行器，以提升測試過程中的推理與驗證能力。例如，相關方法可透過程式執行環境協助模型逐步完成資料處理與結果分析，進而提高測試案例之準確度。\cite{Wang2020AutomaticGeneration}此外，部分研究亦開始嘗試在執行階段動態利用伺服器回應、錯誤訊息與參數描述，修正輸入值或依賴規則，使測試流程具備有限度之動態調整能力。\cite{Kim2025LlamaRestTest}
+    \item \text 在執行輔助與驗證強化方面，大型語言模型亦可結合外部工具或執行器，以提升測試過程中的推理與驗證能力。例如，相關方法可透過程式執行環境協助模型逐步完成資料處理與結果分析，進而提高測試案例之準確度 \parencite{Wang2020AutomaticGeneration}。此外，部分研究亦開始嘗試在執行階段動態利用伺服器回應、錯誤訊息與參數描述，修正輸入值或依賴規則，使測試流程具備有限度之動態調整能力 \parencite{Kim2025LlamaRestTest}。
 \end{enumerate}
 
-\text 儘管大型語言模型方法在上述三個層面均展現出明顯潛力，既有研究仍指出傳統黑箱測試工具在語義與序列長度方面存在明顯限制。一項針對七種代表性模糊測試工具的研究報告結果證實了現有工具在語義和序列長度方面的挑戰，在18個RESTful API上的實證比較顯示，這些工具的程式碼覆蓋率普遍低於60\%，反映出大量未覆蓋程式碼區段仍未被有效觸及。\cite{Zhang2024Open}其原因之一，在於傳統方法生成的序列長度不足，因而難以觸及複雜、深層次的API操作組合。\cite{Karlsson2020QuickREST}
-\text 此外，由於 OpenAPI 規格本身通常不完整涵蓋參數間依賴性，且常存在規格不足（Underspecified Schemas）與語義要求未明確描述之情形，測試序列容易在第一層輸入驗證即失敗。\cite{Banias2021Automated}\cite{Zhang2024Open}在許多情境下，API 服務需以前序請求產生之動態物件，例如資源識別碼或驗證碼，作為後續請求輸入；若僅依靠隨機輸入或靜態字典生成，則極可能導致 404 等錯誤狀態，而無法深入觸發後端邏輯。\cite{Karlsson2020QuickREST}\cite{Banias2021Automated}
-\text 因此，如何生成同時具備語法正確性、語意一致性與依賴關係合理性的測試輸入與操作序列，仍是 RESTful API 自動化測試的重要挑戰。\cite{Kim2025LlamaRestTest}\cite{Zheng2024RESTLess}即使語義增強方法已能有效提升測試輸入品質，例如 ARTE 所生成之語義有效輸入顯著優於隨機方法，\cite{Alonso2023ARTE}相關方法仍未完全解決現實 API 中複雜輸入約束、多步驟操作依賴與執行階段動態變化等問題。\cite{Nguyen2024KAT}
+\text 儘管大型語言模型方法在上述三個層面均展現出明顯潛力，既有研究仍指出傳統黑箱測試工具在語義與序列長度方面存在明顯限制。一項針對七種代表性模糊測試工具的研究報告結果證實了現有工具在語義和序列長度方面的挑戰，在18個RESTful API上的實證比較顯示，這些工具的程式碼覆蓋率普遍低於60\%，反映出大量未覆蓋程式碼區段仍未被有效觸及 \parencite{Zhang2024Open}。其原因之一，在於傳統方法生成的序列長度不足，因而難以觸及複雜、深層次的API操作組合 \parencite{Karlsson2020QuickREST}。
+\text 此外，由於 OpenAPI 規格本身通常不完整涵蓋參數間依賴性，且常存在規格不足（Underspecified Schemas）與語義要求未明確描述之情形，測試序列容易在第一層輸入驗證即失敗 \parencite{Banias2021Automated, Zhang2024Open}。在許多情境下，API 服務需以前序請求產生之動態物件，例如資源識別碼或驗證碼，作為後續請求輸入；若僅依靠隨機輸入或靜態字典生成，則極可能導致 404 等錯誤狀態，而無法深入觸發後端邏輯 \parencite{Karlsson2020QuickREST, Banias2021Automated}。
+\text 因此，如何生成同時具備語法正確性、語意一致性與依賴關係合理性的測試輸入與操作序列，仍是 RESTful API 自動化測試的重要挑戰 \parencite{Kim2025LlamaRestTest, Zheng2024RESTLess}。即使語義增強方法已能有效提升測試輸入品質，例如 ARTE 所生成之語義有效輸入顯著優於隨機方法 \parencite{Alonso2023ARTE}，相關方法仍未完全解決現實 API 中複雜輸入約束、多步驟操作依賴與執行階段動態變化等問題 \parencite{Nguyen2024KAT}。
 \text 綜合而言，現有大型語言模型驅動方法已在規格理解、依賴推論與語義輸入生成方面取得實質進展，並顯著改善傳統模糊測試工具所面臨的大量無效請求問題。然而，這些方法多聚焦於測試案例生成與請求有效性提升，對於真實 API 執行環境中之動態流程控制、失敗後續處理與跨模組協作機制仍著墨有限。此一缺口顯示，未來研究不僅需要更高品質之測試生成能力，亦需要能處理執行階段決策與工作流程連續性之整合式架構，而此亦構成本研究的重要研究定位。
 
 % \section*{HTTP 狀態碼全面解析表} 
@@ -147,13 +147,13 @@ A2A & \cite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & �
 % \end{xltabular}
 
 \section{結合LLM的語義增強與序列優化技術}
-\text RESTLess 是近年大型語言模型增強 RESTful API 測試中具代表性的研究之一，其主要目標在於改善傳統 REST API 模糊測試工具在輸入語義不足與測試序列可達性不足方面的限制。\cite{Zheng2024RESTLess}既有黑箱 REST API 測試工具多以 OpenAPI 規格作為輸入，並依據端點結構、參數型別與操作依賴關係自動產生請求。然而，OpenAPI 規格通常僅能描述欄位型別、必要性、路徑與基本回應格式，對於參數語義、業務規則、資源狀態與跨操作依賴之描述仍相對有限。因此，即使測試工具能夠產生大量請求，仍可能因參數值缺乏真實語義，而在 API 閘道或後端驗證階段遭拒，形成大量 400 或 422 類型之無效請求。
+\text RESTLess 是近年大型語言模型增強 RESTful API 測試中具代表性的研究之一，其主要目標在於改善傳統 REST API 模糊測試工具在輸入語義不足與測試序列可達性不足方面的限制 \parencite{Zheng2024RESTLess}。既有黑箱 REST API 測試工具多以 OpenAPI 規格作為輸入，並依據端點結構、參數型別與操作依賴關係自動產生請求。然而，OpenAPI 規格通常僅能描述欄位型別、必要性、路徑與基本回應格式，對於參數語義、業務規則、資源狀態與跨操作依賴之描述仍相對有限。因此，即使測試工具能夠產生大量請求，仍可能因參數值缺乏真實語義，而在 API 閘道或後端驗證階段遭拒，形成大量 400 或 422 類型之無效請求。
 \begin{enumerate}
     \item 語義增強（Semantic Enhancement）：
-    \text RESTLess 的核心貢獻之一，在於提出一個具備62,250個典型REST API操作的參數名稱和對應鍵值對的 RTSet 作為語義增強資料集，用以提升 REST API 測試過程中參數值生成的語義品質。其方法透過蒐集大量 REST API 常見操作、參數名稱與對應鍵值資料，並結合大型語言模型進行資料擴增，以產生具語義相似性與業務合理性的候選參數值。\cite{Zheng2024RESTLess}此一作法顯示，測試輸入資料不應僅滿足語法正確性，亦須盡可能符合 API 參數本身所隱含之語義要求。若參數名稱或描述涉及特定識別欄位、狀態欄位或結構化值，測試工具即應產生與其語境相符的輸入，而非僅以隨機字串或固定字典值代入。
+    \text RESTLess 的核心貢獻之一，在於提出一個具備62,250個典型REST API操作的參數名稱和對應鍵值對的 RTSet 作為語義增強資料集，用以提升 REST API 測試過程中參數值生成的語義品質。其方法透過蒐集大量 REST API 常見操作、參數名稱與對應鍵值資料，並結合大型語言模型進行資料擴增，以產生具語義相似性與業務合理性的候選參數值 \parencite{Zheng2024RESTLess}。此一作法顯示，測試輸入資料不應僅滿足語法正確性，亦須盡可能符合 API 參數本身所隱含之語義要求。若參數名稱或描述涉及特定識別欄位、狀態欄位或結構化值，測試工具即應產生與其語境相符的輸入，而非僅以隨機字串或固定字典值代入。
     \text 透過語義增強資料集改善參數生成品質，可使測試案例更貼近真實操作語境。當 RTSet 補充或替換原始 OpenAPI 規格中不足之參數範例後，系統便較有機會提升有效請求比例，使更多請求通過前端語法與語義檢查，進一步觸及後端服務邏輯。實驗結果顯示，經過RESTLess增強後的SOTA模糊測試工具，其有效請求序列（Valid sequences，即20X狀態碼）的平均增長率達到42.4\%。對 RESTful API 測試而言，此點尤其重要，因為若測試資料在第一層驗證即被拒絕，則後續狀態轉移、跨資源依賴與深層錯誤皆無法被有效觸發。
     \item 渲染順序優化（Rendering Order Optimization）：
-    \text 測試序列生成方面，RESTLess 亦提出透過參數必要性與操作關係調整請求渲染順序之策略，使必要參數與較關鍵之操作優先被處理，以改善傳統測試工具容易產生短序列且缺乏多樣性操作鏈的問題。\cite{Zheng2024RESTLess}此方法有助於增加測試序列長度與操作組合多樣性，使測試流程更有機會觸及較深層的狀態與業務邏輯。
+    \text 測試序列生成方面，RESTLess 亦提出透過參數必要性與操作關係調整請求渲染順序之策略，使必要參數與較關鍵之操作優先被處理，以改善傳統測試工具容易產生短序列且缺乏多樣性操作鏈的問題 \parencite{Zheng2024RESTLess}。此方法有助於增加測試序列長度與操作組合多樣性，使測試流程更有機會觸及較深層的狀態與業務邏輯。
     \text 在 RESTful API 測試情境中，許多操作並非彼此獨立，而是依賴先前請求所建立之資源或狀態。例如，若要測試查詢、更新或刪除某一資源，通常須先成功建立該資源並取得對應識別資訊。若測試序列無法妥善安排建立、查詢、更新與刪除等操作順序，便容易產生 404 或 403 等結果，進而使測試流程提早中斷。
 \end{enumerate}
 \text 整體而言，RESTLess 透過語義增強與渲染順序優化，提升了測試請求通過前端驗證與雲端閘道檢查之機率，其主要貢獻仍集中於測試輸入與測試序列生成階段。此類方法有效改善了「如何產生較合理請求」與「如何延長測試序列」兩項核心問題，對提升黑箱 RESTful API 測試之有效性具有重要意義，平均提升了54.7\%。
@@ -161,7 +161,9 @@ A2A & \cite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & �
 \text 因此，本節所回顧之文獻顯示，大型語言模型結合語義增強與序列優化技術，已有效推進 RESTful API 測試輸入與序列生成能力，但其研究焦點主要仍停留於請求生成前置階段。當測試進入真實執行環境後，若缺乏對失敗狀態之後續處理與流程延續機制，測試流程仍可能因單次非成功回應而提前終止。此一缺口說明，語義增強與序列優化應被視為自動化測試之必要基礎能力，但尚不足以完整支撐動態 API 生態中的持續測試需求；研究焦點亦因此自然延伸至執行階段之工作流程決策問題。
 
 \section{馬可夫決策過程與強化學習於工作流程決策之應用}
-\text 既有 RESTful API 測試研究，如 RESTler\cite{Atlidakis2019RESTler}、RESTTestGen\cite{Corradini2022RestTestGen}\cite{Viglianisi2020RESTTESTGEN}、RESTLess\cite{Zheng2024RESTLess}、KAT\cite{Nguyen2024KAT} 與 LlamaRestTest\cite{Kim2025LlamaRestTest} 等研究，已分別推進有狀態 REST API 模糊測試、基於 OpenAPI 規格之測試生成、語義輸入增強、依賴感知測試與伺服器回應導向輸入修正等方向。然而，這些方法多半仍聚焦於如何產生更有效的請求、提高測試覆蓋率，或改善測試輸入之語義有效性；相較之下，對於 API 執行過程中失敗後如何根據當前狀態選擇下一步工作流程行為，相關研究仍相對有限。
+\text 既有 RESTful API 測試研究，如 RESTler、RESTTestGen、RESTLess、KAT 與 LlamaRestTest等，已分別推進有狀態 REST API 模糊測試、基於 OpenAPI 規格之測試生成、語義輸入增強、依賴感知測試與伺服器回應導向輸入修正等方向。
+\text 其中，RESTler 與 RESTTestGen 可視為有狀態模糊測試與規格導向測試生成之代表性工作 \parencite{Atlidakis2019RESTler,Corradini2022RestTestGen,Viglianisi2020RESTTESTGEN}；RESTLess、KAT 與 LlamaRestTest則分別對應語義輸入增強、依賴感知測試與回應導向輸入修正之代表性工作 \parencite{Zheng2024RESTLess,Nguyen2024KAT,Kim2025LlamaRestTest}。
+\text 然而，這些方法多半仍聚焦於如何產生更有效的請求、提高測試覆蓋率，或改善測試輸入之語義有效性；相較之下，對於 API 執行過程中失敗後如何根據當前狀態選擇下一步工作流程行為，相關研究仍相對有限。
 \text 由於本研究的工作流程決策問題發生於API執行之後，因此非成功回應之語意不應僅被視為單純失敗訊號，而應被進一步理解為後續工作流程行動之判斷依據。表 \ref{tab:http_status_workflow} 整理本研究特別關注之HTTP狀態碼及其在RESTful API測試情境中的工作流程意涵。
 
 \begin{table}[htbp]
@@ -187,32 +189,32 @@ A2A & \cite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & �
 \end{table}
 
 \text 在實際 RESTful API 工作流程中，非成功回應（Non-success Responses）不一定代表系統異常，也可能來自跨操作依賴、資源狀態不一致、動態參數需求或輸入資料語義不完整等因素。例如，請求可能因缺少有效資源識別碼、授權資訊不足或請求主體語義錯誤而回傳 422、404 或 401。此類情境在本質上更接近工作流程連續性（Workflow Continuity）問題，而非單純之測試失敗問題。
-\text 另一方面，RestGPT\cite{Song2023RestGPT} 及結合複雜 API 任務之大型語言模型測試集相關研究，已展示大型語言模型代理可將自然語言任務轉換為一系列 API 呼叫流程，並於執行過程中動態處理 API 回應，提取下一步所需參數，例如資源識別碼或權杖資訊。這研究證明了，根據 API 執行結果動態調整後續行動，對複雜 RESTful API 任務具有重要性。然而，其主要目標仍在於完成 API 任務本身與流程編排，而非將 API 測試執行過程中的工作流程決策行為，形式化為可重複驗證之狀態轉移問題。此類依據執行狀態持續調整後續行動的過程，本質上可視為一種序列決策（Sequential Decision-Making）問題，並適合以馬可夫決策過程（Markov Decision Process, MDP）加以建模。\cite{rao2022foundations}
-\text 馬可夫決策過程提供一套形式化表示架構，可用以描述代理在環境中根據狀態、動作、狀態轉移與獎勵進行決策之過程，亦構成強化學習（Reinforcement Learning）方法的重要理論基礎。\cite{rao2022foundations}在軟體工程與智慧系統研究中，已有多項工作將複雜決策任務建模為狀態、動作與獎勵所組成之序列決策問題，以支援動態策略學習。例如，PyTester 將文本轉測試案例問題建模為馬可夫決策過程，並透過策略學習提升生成程式碼之可執行性與覆蓋能力；\cite{Takerngsaksiri2025Pytester}AAMC 則將模型選擇問題形式化為多目標決策問題，以平衡效能、成本與延遲。\cite{Rjoub2026Adaptive}
-\text 在多代理決策研究中，近期亦有工作探討如何使大型語言模型與環境回饋對齊，以提升多代理強化學習中的探索、溝通與協同行為，顯示大型語言模型不僅可用於生成，也可作為決策輔助元件。\cite{Zhang2026EALLMs}此外，結合大型語言模型與多代理深度強化學習的研究亦指出，當決策問題涉及多步驟流程、資源限制與動態狀態轉移時，學習式策略有助於提升整體流程效率與決策品質。\cite{Gu2026Large}
+\text 另一方面，RestGPT\parencite{Song2023RestGPT} 及結合複雜 API 任務之大型語言模型測試集相關研究，已展示大型語言模型代理可將自然語言任務轉換為一系列 API 呼叫流程，並於執行過程中動態處理 API 回應，提取下一步所需參數，例如資源識別碼或權杖資訊。這研究證明了，根據 API 執行結果動態調整後續行動，對複雜 RESTful API 任務具有重要性。然而，其主要目標仍在於完成 API 任務本身與流程編排，而非將 API 測試執行過程中的工作流程決策行為，形式化為可重複驗證之狀態轉移問題。此類依據執行狀態持續調整後續行動的過程，本質上可視為一種序列決策（Sequential Decision-Making）問題，並適合以馬可夫決策過程（Markov Decision Process, MDP）加以建模 \parencite{rao2022foundations}。
+\text 馬可夫決策過程提供一套形式化表示架構，可用以描述代理在環境中根據狀態、動作、狀態轉移與獎勵進行決策之過程，亦構成強化學習（Reinforcement Learning）方法的重要理論基礎 \parencite{rao2022foundations}。在軟體工程與智慧系統研究中，已有多項工作將複雜決策任務建模為狀態、動作與獎勵所組成之序列決策問題，以支援動態策略學習。例如，PyTester 將文本轉測試案例問題建模為馬可夫決策過程，並透過策略學習提升生成程式碼之可執行性與覆蓋能力 \parencite{Takerngsaksiri2025Pytester}；AAMC 則將模型選擇問題形式化為多目標決策問題，以平衡效能、成本與延遲 \parencite{Rjoub2026Adaptive}。
+\text 在多代理決策研究中，近期亦有工作探討如何使大型語言模型與環境回饋對齊，以提升多代理強化學習中的探索、溝通與協同行為，顯示大型語言模型不僅可用於生成，也可作為決策輔助元件 \parencite{Zhang2026EALLMs}。此外，結合大型語言模型與多代理深度強化學習的研究亦指出，當決策問題涉及多步驟流程、資源限制與動態狀態轉移時，學習式策略有助於提升整體流程效率與決策品質 \parencite{Gu2026Large}。
 \text 就 API 測試情境而言，若能將執行過程中的狀態變化、後續處置行動與結果回饋加以形式化描述，則工作流程決策便可由固定規則控制，轉化為可分析、可比較且可學習之決策問題。相較於傳統以靜態規則驅動之工作流程控制方式，基於狀態轉移與回饋訊號之學習式方法，理論上更能根據歷史執行結果調整決策策略，並在不同環境狀態下選擇較適切之後續行動。
 \text 然而，現有文獻對於此類工作流程決策問題之探討仍相對不足。多數 RESTful API 測試研究將改進重點放在請求生成、依賴推論與語義輸入修正，較少明確處理測試執行階段中失敗後應如何進行後續處置，以及這些處置行為如何形成可學習之決策過程。換言之，現有方法雖已改善測試輸入品質與序列可達性，但對於測試流程在動態環境中的持續推進能力，仍缺乏系統性建模。
 \text 綜合上述文獻可知，馬可夫決策過程與強化學習提供了一套可用於分析工作流程連續性問題的理論基礎，使 RESTful API 測試之執行階段不再僅被視為單次請求成功與否的判定，而可進一步被理解為一個需要根據狀態持續選擇後續行動的序列決策問題。此一觀點亦構成本研究之研究定位：在既有語義增強與測試生成方法之外，進一步探討如何以學習式決策機制處理 API 測試執行階段之工作流程控制問題。
 
 \section{大型語言模型領域中AI Agent測試技術發展歷程與里程碑}
-\text 大型語言模型（Large Language Models, LLMs）的出現，促使人工智慧系統由以往偏向被動式回應的工具，逐步轉向具備自主推理與任務執行潛力之系統。\cite{Hosseini2025Role}\cite{Bandi2025Rise}在軟體測試領域中，相關研究迅速將大型語言模型應用於測試用例生成、故障定位與測試輔助等任務，顯示其在處理自然語言需求、程式碼語境與測試資料生成方面具備明顯潛力。\cite{Fatima2023Flakify}\cite{Xu2025FlexFL}\cite{Anonymous2023LLMGenerators}\cite{Wang2024Software}\cite{Anonymous2025GenAIRoles}
-\text 早期研究主要著重於利用大型語言模型輔助測試用例生成、輸入資料產生或故障定位等單一任務。\cite{Anonymous2023LLMGenerators}\cite{Wang2024Software}例如，KAT 利用 GPT 模型與提示工程辨識 RESTful API 間的依賴關係，以提升測試覆蓋並減少誤報，證明了大型語言模型在生成測試腳本和資料方面的有效性；\cite{Nguyen2024KAT}FlexFL 則基於大型語言模型能夠在Top-1（即可疑度第一名，以Top-K法評估定位演算法精確度的核心標準指標）排名中定位到93個傳統方法錯過的錯誤，並表現出更強的靈活性（Enhanced flexibility），同時利用錯誤報告與測試套件資訊，預測不穩定測試案例改善故障定位表現。\cite{Xu2025FlexFL}\cite{Fatima2023Flakify}此發展脈絡說明，大型語言模型已不再僅是文字生成工具，而逐漸成為可支援複雜工程任務之推理元件。
-\text 隨著大型語言模型能力提升，研究焦點亦逐步由單一模型處理單一任務，轉向更具自主性與協作性的代理式系統。所謂人工智慧代理（AI Agent），可視為能感知環境、進行推理並採取行動以完成特定任務之軟體實體。\cite{Bandi2025Rise}進一步地，代理式人工智慧（Agentic AI）則強調多個具專責角色之代理，透過協作、規劃與狀態交換，共同完成較複雜之高層次目標。\cite{Bandi2025Rise}\cite{Borghoff2025Beyond}此種發展對於 RESTful API 測試特別重要，因為相關任務往往同時涉及規格理解、測試生成、工具調用、結果分析與後續處置，單一模型未必能高效完成全部流程。
+\text 大型語言模型（Large Language Models, LLMs）的出現，促使人工智慧系統由以往偏向被動式回應的工具，逐步轉向具備自主推理與任務執行潛力之系統 \parencite{Hosseini2025Role, Bandi2025Rise}。在軟體測試領域中，相關研究迅速將大型語言模型應用於測試用例生成、故障定位與測試輔助等任務，顯示其在處理自然語言需求、程式碼語境與測試資料生成方面具備明顯潛力 \parencite{Fatima2023Flakify, Xu2025FlexFL, Anonymous2023LLMGenerators, Wang2024Software, Anonymous2025GenAIRoles}。
+\text 早期研究主要著重於利用大型語言模型輔助測試用例生成、輸入資料產生或故障定位等單一任務 \parencite{Anonymous2023LLMGenerators, Wang2024Software}。例如，KAT 利用 GPT 模型與提示工程辨識 RESTful API 間的依賴關係，以提升測試覆蓋並減少誤報，證明了大型語言模型在生成測試腳本和資料方面的有效性 \parencite{Nguyen2024KAT}；FlexFL 則基於大型語言模型能夠在Top-1（即可疑度第一名，以Top-K法評估定位演算法精確度的核心標準指標）排名中定位到93個傳統方法錯過的錯誤，並表現出更強的靈活性（Enhanced flexibility），同時利用錯誤報告與測試套件資訊，預測不穩定測試案例改善故障定位表現 \parencite{Xu2025FlexFL, Fatima2023Flakify}。此發展脈絡說明，大型語言模型已不再僅是文字生成工具，而逐漸成為可支援複雜工程任務之推理元件。
+\text 隨著大型語言模型能力提升，研究焦點亦逐步由單一模型處理單一任務，轉向更具自主性與協作性的代理式系統。所謂人工智慧代理（AI Agent），可視為能感知環境、進行推理並採取行動以完成特定任務之軟體實體 \parencite{Bandi2025Rise}。進一步地，代理式人工智慧（Agentic AI）則強調多個具專責角色之代理，透過協作、規劃與狀態交換，共同完成較複雜之高層次目標 \parencite{Bandi2025Rise, Borghoff2025Beyond}。此種發展對於 RESTful API 測試特別重要，因為相關任務往往同時涉及規格理解、測試生成、工具調用、結果分析與後續處置，單一模型未必能高效完成全部流程。
 
 \subsection{多代理系統與傳統架構的挑戰}
-\text 多代理系統（Multi-Agent Systems, MAS）已被廣泛應用於自動化軟體測試、故障定位、資訊技術維運流程與其他複雜任務。\cite{Borghoff2025Beyond}\cite{Bandi2025Rise}其核心優勢在於可將複雜任務拆解為多個子任務，分派給不同代理處理，並透過工具調用與外部服務互動，形成較具彈性的工作流程。
-\text 然而，現有第一代大型語言模型原生框架，例如 LangChain、LlamaIndex 與 AutoGen，雖然在代理開發與流程串接上展現高度潛力，但於大規模協作情境中仍暴露出若干架構限制。\cite{Borghoff2025Beyond}LangChain 及其衍生框架 LangGraph 強調模組化工作流程、狀態轉移與圖形化執行能力，但其流程協調仍大量依賴模型推理，導致例行性流程控制也需付出高昂推理成本。\cite{Ehtesham2025SurveyMCPACPA2AANP}\cite{Borghoff2025Beyond}LlamaIndex 則偏重於知識整合與外部資料索引，較少處理多代理任務協調本身。\cite{Ehtesham2025SurveyMCPACPA2AANP}AutoGen 雖專為多代理互動設計，具備規劃、反思與協作能力，但其核心協調方式仍多依賴提示式對話機制，而非正式協定或可驗證之流程模型。\cite{Borghoff2025Beyond}\cite{Bandi2025Rise}
-\text 此類以連續提示鏈與集中式模型協調為主的架構，雖可快速建構多代理流程框架，卻也帶來可擴展性不足、協調成本偏高與正式驗證困難等問題。\cite{Borghoff2025Beyond}相對而言，TB-CSPN 等形式化協調架構主張將語義處理與流程協調分離，以降低流程控制對大型語言模型推理之依賴，並提升協調過程的可追蹤性與可驗證性。實證評估顯示，TB-CSPN比LangGraph風格的協調快 62.5\%，大型語言模型API 呼叫減少 66.7\%，證明了架構分離的效率。\cite{Borghoff2025Beyond}這觀點對本研究具有重要啟示，因其指出多代理系統的價值不僅在於任務分工，更在於如何以合理架構支撐穩定之流程控制。
+\text 多代理系統（Multi-Agent Systems, MAS）已被廣泛應用於自動化軟體測試、故障定位、資訊技術維運流程與其他複雜任務 \parencite{Borghoff2025Beyond, Bandi2025Rise}。其核心優勢在於可將複雜任務拆解為多個子任務，分派給不同代理處理，並透過工具調用與外部服務互動，形成較具彈性的工作流程。
+\text 然而，現有第一代大型語言模型原生框架，例如 LangChain、LlamaIndex 與 AutoGen，雖然在代理開發與流程串接上展現高度潛力，但於大規模協作情境中仍暴露出若干架構限制 \parencite{Borghoff2025Beyond}。LangChain 及其衍生框架 LangGraph 強調模組化工作流程、狀態轉移與圖形化執行能力，但其流程協調仍大量依賴模型推理，導致例行性流程控制也需付出高昂推理成本 \parencite{Ehtesham2025SurveyMCPACPA2AANP, Borghoff2025Beyond}。LlamaIndex 則偏重於知識整合與外部資料索引，較少處理多代理任務協調本身 \parencite{Ehtesham2025SurveyMCPACPA2AANP}。AutoGen 雖專為多代理互動設計，具備規劃、反思與協作能力，但其核心協調方式仍多依賴提示式對話機制，而非正式協定或可驗證之流程模型 \parencite{Borghoff2025Beyond, Bandi2025Rise}。
+\text 此類以連續提示鏈與集中式模型協調為主的架構，雖可快速建構多代理流程框架，卻也帶來可擴展性不足、協調成本偏高與正式驗證困難等問題 \parencite{Borghoff2025Beyond}。相對而言，TB-CSPN 等形式化協調架構主張將語義處理與流程協調分離，以降低流程控制對大型語言模型推理之依賴，並提升協調過程的可追蹤性與可驗證性。實證評估顯示，TB-CSPN比LangGraph風格的協調快 62.5\%，大型語言模型API 呼叫減少 66.7\%，證明了架構分離的效率 \parencite{Borghoff2025Beyond}。這觀點對本研究具有重要啟示，因其指出多代理系統的價值不僅在於任務分工，更在於如何以合理架構支撐穩定之流程控制。
 
 \subsection{Multi-Agent自動化生成測試案例}
-\text 大型語言模型驅動的多代理系統，已逐漸成為自動化測試案例生成的重要發展方向，特別適用於需同時處理規劃、計算、工具調用與結果驗證之複雜任務。\cite{Anonymous2023LLMGenerators}\cite{Bandi2025Rise}\cite{Hosseini2025Role}\cite{Borghoff2025Beyond}此類研究的核心想法，在於將測試生成流程拆解為具專責角色的子任務，由不同代理各自負責輸入生成、預期輸出推導、程式碼產生或結果檢查，藉此提升生成品質與流程效率。
-\text 例如，TestChain 將測試案例生成問題拆分為測試輸入生成與測試輸出生成兩個子任務，Designer agent專注於生成多樣化的測試輸入，包括基礎和邊緣案例，Calculator agent則負責確定對應的預期測試輸出，並透過ReAct格式的對話鏈與Python解譯器進行互動。以GPT-4作為基礎模型的TestChain在LeetCode-hard資料集上的測試案例準確性（Accuracy）提高了13.84\%，證明了這種代理分工和外部工具協作的有效性，亦顯著減少了輸入及輸出映射中的複雜性和不準確性。\cite{Anonymous2023LLMGenerators}AutoGen 與 MetaGPT 等框架則進一步展示，多代理協作可透過規劃、反思與角色分工，提高處理複雜任務之能力。\cite{Bandi2025Rise}在微服務與端對端系統中，這種協作尤具意義，因為相關測試任務通常涉及多步驟資源依賴與多來源資訊整合。\cite{Sun2024Detecting}
+\text 大型語言模型驅動的多代理系統，已逐漸成為自動化測試案例生成的重要發展方向，特別適用於需同時處理規劃、計算、工具調用與結果驗證之複雜任務 \parencite{Anonymous2023LLMGenerators, Bandi2025Rise, Hosseini2025Role, Borghoff2025Beyond}。此類研究的核心想法，在於將測試生成流程拆解為具專責角色的子任務，由不同代理各自負責輸入生成、預期輸出推導、程式碼產生或結果檢查，藉此提升生成品質與流程效率。
+\text 例如，TestChain 將測試案例生成問題拆分為測試輸入生成與測試輸出生成兩個子任務，Designer agent專注於生成多樣化的測試輸入，包括基礎和邊緣案例，Calculator agent則負責確定對應的預期測試輸出，並透過ReAct格式的對話鏈與Python解譯器進行互動。以GPT-4作為基礎模型的TestChain在LeetCode-hard資料集上的測試案例準確性（Accuracy）提高了13.84\%，證明了這種代理分工和外部工具協作的有效性，亦顯著減少了輸入及輸出映射中的複雜性和不準確性 \parencite{Anonymous2023LLMGenerators}。AutoGen 與 MetaGPT 等框架則進一步展示，多代理協作可透過規劃、反思與角色分工，提高處理複雜任務之能力 \parencite{Bandi2025Rise}。在微服務與端對端系統中，這種協作尤具意義，因為相關測試任務通常涉及多步驟資源依賴與多來源資訊整合 \parencite{Sun2024Detecting}。
 \text 然而，既有多代理測試生成研究多聚焦於如何提高測試案例生成品質、改善工具調用能力與提升協作效率，對於測試執行過程中如何根據當前狀態調整後續工作流程，仍少有進一步建模與分析。換言之，多代理研究已展現其在前置生成與流程拆解上的優勢，但對於測試流程中斷後的決策機制與流程連續性支援，仍未形成一致且可驗證之研究主軸。
 
 \subsection{Hybrid Architecture協作機制的發展與創新理念}
 \subsubsection*{（一）AI Agent標準化協定概述與比較}
-\text 隨著多代理系統逐步從研究原型走向實際應用，傳統臨時性整合（Ad-hoc Integration）已難以支撐大規模、多來源與跨平台之協作需求。為改善代理系統在互通性、安全性與擴展性上的限制，近年業界陸續提出標準化通訊協定，以建立較穩健之代理生態系統。\cite{Ehtesham2025SurveyMCPACPA2AANP}
-\text 其中，模型上下文協定（Model Context Protocol, MCP）主要著重於大型語言模型與外部工具、資源及上下文之垂直整合，提供一致的上下文攝取與工具調用介面；代理對代理協定（Agent-to-Agent Protocol, A2A）則著重於代理之間的水平協作，支援任務委派、能力描述與結構化狀態交換。\cite{Ehtesham2025SurveyMCPACPA2AANP}此外，代理通訊協定（Agent Communication Protocol, ACP）與代理網路協定（Agent Network Protocol, ANP）則分別代表通用整合與去中心化互聯方向，反映代理協定設計已逐漸由單點工具整合，延伸至更完整之分散式協作架構。
+\text 隨著多代理系統逐步從研究原型走向實際應用，傳統臨時性整合（Ad-hoc Integration）已難以支撐大規模、多來源與跨平台之協作需求。為改善代理系統在互通性、安全性與擴展性上的限制，近年業界陸續提出標準化通訊協定，以建立較穩健之代理生態系統 \parencite{Ehtesham2025SurveyMCPACPA2AANP}。
+\text 其中，模型上下文協定（Model Context Protocol, MCP）主要著重於大型語言模型與外部工具、資源及上下文之垂直整合，提供一致的上下文攝取與工具調用介面；代理對代理協定（Agent-to-Agent Protocol, A2A）則著重於代理之間的水平協作，支援任務委派、能力描述與結構化狀態交換 \parencite{Ehtesham2025SurveyMCPACPA2AANP}。此外，代理通訊協定（Agent Communication Protocol, ACP）與代理網路協定（Agent Network Protocol, ANP）則分別代表通用整合與去中心化互聯方向，反映代理協定設計已逐漸由單點工具整合，延伸至更完整之分散式協作架構。
 \text 就本研究主題而言，MCP 與 A2A 之價值尤為關鍵。前者有助於處理規格文件、知識資源與外部工具之存取一致性；後者則有助於代理之間的任務協作與狀態傳遞。二者分別對應垂直整合與水平協作需求，為代理式測試流程之職責分離提供了重要基礎。表 \ref{tab:protocol_comparison} 比較 MCP、A2A、ACP 與 ANP 在架構、應用範疇、互通性、安全性與擴展性上的差異。
 
 \begin{table}[htbp]
@@ -257,13 +259,13 @@ A2A & \cite{Ehtesham2025SurveyMCPACPA2AANP,Tupe2024MultiAgentCollaboration} & �
         適用於開放代理市場，但協商開銷高。 \\
         \bottomrule
     \end{tabularx}
-\end {table}
+\end{table}
 
 \subsubsection*{（二）雙協定協作的創新案例與優勢}
-\text 此外，近期研究亦顯示，結合上下文感知與動態任務卸載機制的代理式架構，有助於提升系統在變動環境中的決策適應能力。\cite{Elmazi2026Proactive}多代理強化學習亦已被用於需要即時回饋與多目標協調的控制情境，顯示代理式決策架構不僅適用於流程編排，也適合處理動態狀態下的策略選擇問題。\cite{Tao2026Personalized}
-\text 在多代理系統的發展中，單一協定往往難以同時解決工具整合、上下文一致性、代理協作與能力發現等問題，因此多協定整合逐漸成為一項可行方向。相關研究指出，MCP 適合處理大型語言模型與外部工具之垂直整合，而 A2A 則適合處理代理之間之水平協作與任務委派。\cite{Tupe2024MultiAgentCollaboration}\cite{Ehtesham2025SurveyMCPACPA2AANP}
-\text 以資訊技術事件響應案例為例，相關研究展示了 A2A 與 MCP 之整合方式：協調代理可透過 A2A 負責任務委派與狀態追蹤，而診斷代理則透過 MCP 存取診斷工具與知識資源，以維持多步驟操作中的上下文一致性。\cite{Tupe2024MultiAgentCollaboration}在這案例中顯示，MCP與A2A雙協定整合有助於克服傳統多代理系統在上下文分享、能力發現與訊息格式不相容方面的限制，並為具多步驟性與高互動性的任務提供較清楚的分層架構。
-\text 然而，相關研究亦指出，多協定整合本身仍可能引入語義不匹配、安全性風險與協調複雜性，因而需要更明確之分工架構與協調機制。\cite{Borghoff2025Beyond}就本研究主題而言，這觀察具有重要意義：MCP 與 A2A 的價值不僅在於工具與代理可以互通，更在於其是否能於RESTful API測試場景中形成可重複驗證之流程結構。類似的多代理分工與協同規劃觀點，也已被應用於智慧製造與進階排程問題，顯示代理式系統在多步驟決策與任務協調方面具有良好擴展性。\cite{Li2026AP4S}
+\text 此外，近期研究亦顯示，結合上下文感知與動態任務卸載機制的代理式架構，有助於提升系統在變動環境中的決策適應能力 \parencite{Elmazi2026Proactive}。多代理強化學習亦已被用於需要即時回饋與多目標協調的控制情境，顯示代理式決策架構不僅適用於流程編排，也適合處理動態狀態下的策略選擇問題 \parencite{Tao2026Personalized}。
+\text 在多代理系統的發展中，單一協定往往難以同時解決工具整合、上下文一致性、代理協作與能力發現等問題，因此多協定整合逐漸成為一項可行方向。相關研究指出，MCP 適合處理大型語言模型與外部工具之垂直整合，而 A2A 則適合處理代理之間之水平協作與任務委派 \parencite{Tupe2024MultiAgentCollaboration, Ehtesham2025SurveyMCPACPA2AANP}。
+\text 以資訊技術事件響應案例為例，相關研究展示了 A2A 與 MCP 之整合方式：協調代理可透過 A2A 負責任務委派與狀態追蹤，而診斷代理則透過 MCP 存取診斷工具與知識資源，以維持多步驟操作中的上下文一致性 \parencite{Tupe2024MultiAgentCollaboration}。在這案例中顯示，MCP與A2A雙協定整合有助於克服傳統多代理系統在上下文分享、能力發現與訊息格式不相容方面的限制，並為具多步驟性與高互動性的任務提供較清楚的分層架構。
+\text 然而，相關研究亦指出，多協定整合本身仍可能引入語義不匹配、安全性風險與協調複雜性，因而需要更明確之分工架構與協調機制 \parencite{Borghoff2025Beyond}。就本研究主題而言，這觀察具有重要意義：MCP 與 A2A 的價值不僅在於工具與代理可以互通，更在於其是否能於RESTful API測試場景中形成可重複驗證之流程結構。類似的多代理分工與協同規劃觀點，也已被應用於智慧製造與進階排程問題，顯示代理式系統在多步驟決策與任務協調方面具有良好擴展性 \parencite{Li2026AP4S}。
 \text 綜合而言，現有 AI Agent、多代理系統與標準化協定研究，已顯示大型語言模型系統可由單一模型操作，逐步發展為結合多代理分工、外部工具調用與標準化互通機制之複雜流程架構。然而，多數研究重點仍在於任務生成、協作效率或協定設計本身，對於 RESTful API 測試流程中如何整合多代理協作、上下文工具調用與執行階段後續決策，仍缺乏系統性驗證。現有方法主要改善請求生成或語意輸入品質，對執行後工作流程決策與恢復策略之系統性建模仍相對不足，此一缺口正是本研究進一步切入之基礎。
 
 \end{ZhChapter}

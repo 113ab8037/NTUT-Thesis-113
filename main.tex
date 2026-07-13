@@ -1,6 +1,6 @@
 \documentclass[12pt, a4paper]{ntut-report}
 \usepackage[dvips,xetex]{graphicx}
-\usepackage{ifpdf,mla}% <-- mla.sty requires ifpdf.sty, but (perversely) doesn't load it
+\usepackage{ifpdf}
 \usepackage{url}
 \usepackage{xurl} % 允許網址在任何地方斷行
 \usepackage{fontspec}
@@ -17,11 +17,11 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{amsmath}  % 建議一併載入，提供更強大的數學公式支援
-\usepackage[backend=biber,sorting=none]{biblatex}
+\usepackage[style=apa,backend=biber,sortcites=true,sorting=nyt]{biblatex}
+\DeclareLanguageMapping{english}{english-apa}
 \usepackage{tabularx} % 自動調整欄寬
 \usepackage{booktabs} % 用於美化表格線條
 \usepackage{longtable} % 支援跨頁表格
-\usepackage{ltablex}    % 結合 longtable 與 tabularx
 \usepackage{ragged2e} % 用於更好的文字對齊
 \usepackage[table]{xcolor} % 這是最關鍵的
 \usepackage{xltabular}        % 支援跨頁 (longtable) 且可自訂寬度 (tabularx)
@@ -43,7 +43,7 @@
 \setCJKmonofont{Menlo}
 \setCJKmainfont{DFKai-SB.ttf} % 中文字體
 \setmainfont{Times New Roman} % 英文字體
-\geometry{a4paper,total={297mm,210mm},top=4.5cm,bottom=0.75cm,left=2.5cm,right=2.5cm} % 頁面設定，不需修改
+\geometry{a4paper,top=3cm,bottom=2.5cm,left=3cm,right=2cm}
 \pagestyle{plain} % 頁碼
 \addbibresource{reference.bib}
 
@@ -73,7 +73,7 @@
 % 摘要頁（英文）Abstract (English)
 \include{page/03_abstract-en.tex}
 % 鳴謝 Acknowledgements
-% \include{page/04_thanks.tex}
+\include{page/04_thanks.tex}
 % 目錄、表目錄與圖目錄 Table of Contents, List of tables, List of figures
 \include{page/05_table-of-content.tex}
  

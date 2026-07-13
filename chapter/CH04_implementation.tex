@@ -2,7 +2,7 @@
 
 \chapter{實驗過程與結果}
 \text 本章的版本比較為同一套RESTful API自動化測試系統逐步加入不同能力模組後之描述性結果，涵蓋規格理解、語意輸入建構、多代理測試實體化、工作流程決策與執行後恢復能力之累積演進。
-\text 本章重點在於呈現系統能力演進與主要有效機制，而非演算法競賽式比較。v1至v2的評估以 HTTP 狀態碼為主要通過條件，v3至v5則導入 manual rule 進行任務層級判定，評估標準的收緊直接影響絕對通過率，因此不能直接說明系統能力。v4與v5是在相同測試生成基礎上替換工作流程決策機制，兩者共用相同之恢復執行層，差異僅在決策策略之選擇方式。因此，主要在變因控制上的比較，其結果可直接地反映兩種決策策略之有效情境差異。主要觀測指標為Workflow Recovered Pass，用以衡量工作流程恢復層於執行失敗後之實際恢復能力，此指標為v5 相對於v3、v4 之核心差異所在。
+\text 本章重點在於呈現系統能力演進與主要有效機制，而非演算法競賽式比較。v1至v2的評估以HTTP狀態碼為主要通過條件，其通過判定不包含操作間業務邏輯的語意合規性驗證；v3至v5則同步導入Manual Rule進行任務層級判定，兩組版本衡量的是不同層次的成功定義，通過率的絕對數值不宜直接比較。v4在v3基礎上加入工作流程決策分類模組，負責對執行結果進行狀態分類與事件記錄，作為離線策略訓練之資料來源；v5則以Offline-Q Policy為決策選擇器，於判定可恢復狀態時實際觸發恢復執行。差異僅在決策策略之選擇方式。因此，主要在變因控制上的比較，其結果可直接地反映兩種決策策略之有效情境差異。主要觀測指標為Workflow Recovered Pass，用以衡量工作流程恢復層於執行失敗後之實際恢復能力，此指標為v5 相對於v3、v4 之核心差異所在。
 
 \section{開發環境與系統配置}
 \text 本研究以Python作為主要開發語言，建置一套結合大型語言模型、多代理協作機制、工作流程引擎與離線強化學習決策策略之RESTful API自動化測試框架。整體系統採模組化架構設計，各功能模組透過工作流程狀態（Workflow State）進行資料交換，並由工作流程引擎統一管理執行順序。系統實作主要包含OpenAPI規格解析、多代理規格討論、測試案例生成、測試程式實體化、API執行、工作流程決策、離線策略訓練以及測試報告產生等模組。各模組皆以Python類別與函式實作，並透過LangGraph建立可追蹤之工作流程圖，以支援節點級執行紀錄與狀態管理。
@@ -35,7 +35,7 @@ API規格格式 & OpenAPI Specification 3.0.3 \\
 \end{table}
 
 \section{資料來源與測試目標}
-\text 本研究之RESTful API測試環境主要採用RESTGPT研究所公開之測試資料作為基礎來源\cite{Song2023RestGPT}。RESTGPT研究整理多個具備OpenAPI規格文件之公開RESTful API服務，並針對不同API建立對應之任務描述（Task Description）與執行路徑（Gold Path）作為大型語言模型與真實世界API操作互動之驗證環境。考量本研究聚焦於RESTful API測試流程、跨操作資源依賴以及工作流程決策策略之驗證，而非重新建構大型API資料集，因此選擇RESTGPT所提供之TMDB（The Movie Database）資料集作為主要實驗環境。TMDB資料集提供完整OpenAPI規格文件、公開開發者平台以及涵蓋多種API情境，資料集數量充足且涵蓋查詢、建立、修改與刪除等多種操作類型，同時存在跨操作資源依賴關係。RESTGPT已整理100筆Gold Path任務案例，可作為測試案例驗證基準，適合作為工作流程導向API測試之研究案例。
+\text 本研究之RESTful API測試環境主要採用RESTGPT研究所公開之測試資料作為基礎來源\parencite{Song2023RestGPT}。RESTGPT研究整理多個具備OpenAPI規格文件之公開RESTful API服務，並針對不同API建立對應之任務描述（Task Description）與執行路徑（Gold Path）作為大型語言模型與真實世界API操作互動之驗證環境。考量本研究聚焦於RESTful API測試流程、跨操作資源依賴以及工作流程決策策略之驗證，而非重新建構大型API資料集，因此選擇RESTGPT所提供之TMDB（The Movie Database）資料集作為主要實驗環境。TMDB資料集提供完整OpenAPI規格文件、公開開發者平台以及涵蓋多種API情境，資料集數量充足且涵蓋查詢、建立、修改與刪除等多種操作類型，同時存在跨操作資源依賴關係。RESTGPT已整理100筆Gold Path任務案例，可作為測試案例驗證基準，適合作為工作流程導向API測試之研究案例。
 \text 相較於重新建構任務資料集，直接採用RESTGPT已驗證之Gold Path能降低人工標註成本，並提高不同研究之間的可比較性。因此，本研究以RESTGPT之TMDB資料集作為主要測試來源，並以其100筆Gold Path作為測試任務基準。在實際執行環境方面，由於TMDB API需要授權驗證，本研究則自行申請TMDB開發者帳號並取得API Access Token，以建立可執行之Live Execution環境。所有API測試皆透過實際HTTP請求與TMDB公開服務進行互動，而非使用模擬回應（Mock Response）或離線Replay環境，以確保測試流程符合服務提供者之使用規範。
 \text 本研究將RESTGPT提供tmdb dataset之query與solution納為Gold Path作為MCP Context建構流程，使後續規格討論、多代理推理、測試案例生成與工作流程決策皆能建立於相同知識來源之上。
 
@@ -51,7 +51,7 @@ API規格格式 & OpenAPI Specification 3.0.3 \\
 \textbf{項目} & \textbf{內容} \\
 \midrule
 資料來源 & TMDB API \\
-來源研究 & RESTGPT \cite{Song2023RestGPT} \\
+來源研究 & RESTGPT \parencite{Song2023RestGPT} \\
 API類型 & Public RESTful API \\
 規格格式 & OpenAPI Specification \\
 認證方式 & Bearer Token Authentication \\
@@ -73,6 +73,7 @@ API類型 & Public RESTful API \\
 % \end{figure*}
 
 \section{Benchmark 設計}
+\text 傳統RESTful API測試評估指標（如端點覆蓋率、程式碼覆蓋率或突變測試分數）主要針對單一HTTP請求之功能正確性與測試充分性進行衡量，難以反映跨操作資源依賴、授權流程、工作流程決策介入以及任務層級完成性等因素之影響。本研究目標不在於測量API端點的覆蓋廣度，而在於評估系統能否在具有明確任務目標、操作依賴與可接受失敗條件的情境下，完成具語意意義之API測試任務並正確作出工作流程決策。因此，本研究選用任務導向測試基準（Task-Oriented Benchmark）作為主要評估框架，以Task Case為分析單位，並以Manual Rule作為最終判定依據，而非僅依賴HTTP狀態碼。
 \text 本研究之實驗評估採用的Benchmark設計是任務導向測試基準（Task-Oriented Benchmark）。若僅以單一HTTP請求是否成功作為評估標準，將難以衡量跨操作依賴、授權流程以及工作流程決策策略對整體測試任務之影響。本研究之主要實驗基準採用RESTGPT所提供之TMDB Task Dataset與Gold Path資料，並結合人工規則文件（Manual Rules）形成100筆任務導向測試案例（Task-Oriented Test Cases）。
 \text 每一筆測試案例均包含：Task Description、Gold Path Solution、對應Manual Rule、預期輸入參數、預期輸出結果、可接受失敗條件（Acceptable Failure Conditions）
 \text 不同於一般API Benchmark以單一HTTP請求作為評估單位，本研究以完整任務（Task）作為分析單位。每一個Task可能包含多個API操作與跨步驟資源依賴，因此更能反映真實API測試情境。
@@ -120,13 +121,13 @@ v5 & v3 + Offline-Q Workflow Decision Policy \\
 \end{table}
 
 \paragraph{Version 1：Random Execution Baseline}
-\text Version 1為最基礎之Baseline。系統僅根據OpenAPI端點資訊產生隨機測試請求，不使用Manual Rule、不建立語意輸入，也不進行跨步驟依賴推理。此版本主要用於觀察完全缺乏語意資訊時之基礎通過率。
+\text Version 1為最基礎之Baseline，使用 HTTP 層評估。系統僅根據OpenAPI端點資訊產生隨機測試請求，不使用Manual Rule、不建立語意輸入，也不進行跨步驟依賴推理。此版本主要用於觀察完全缺乏語意資訊時之基礎通過率。
 \paragraph{Version 2：Specification-Guided Execution}
 \text Version 2加入OpenAPI Specification解析與Seeded Input Generation。系統可利用規格資訊產生較合理之測試輸入，降低無效請求比例，但仍未導入多代理協作與工作流程決策機制。
 \paragraph{Version 3：Multi-Agent Test Materialization}
-\text Version 3於Version 2基礎上加入多代理協作機制。系統透過Specification Discussion分析規格限制與依賴關係，並由Test Author與Test Reviewer共同產生可執行測試程式。此版本代表本研究完整測試生成能力，但尚未具備工作流程恢復能力。
+\text Version 3於Version 2基礎上加入多代理協作機制後，同步導入 Manual Rule。系統透過Specification Discussion分析規格限制與依賴關係，並由Test Author與Test Reviewer共同產生可執行測試程式。此版本代表本研究完整測試生成能力，但尚未具備工作流程恢復能力。
 \paragraph{Version 4：Rule-based Workflow Decision Policy}
-\text Version 4於Version 3基礎上加入工作流程決策模組。系統根據HTTP Status Code、Semantic Error Type、Dependency Status以及Retry History等訊號，透過預先定義之規則選擇恢復行動。典型決策包括：
+\text Version 4於Version 3基礎上加入工作流程決策模組。系統根據HTTP Status Code、Semantic Error Type、Dependency Status以及Retry History等訊號，透過預先定義之規則對工作流程決策行動進行分類標記，並將狀態、行動、獎勵與後續狀態記錄為WorkflowDecisionEvent，作為後續Offline-Q策略訓練之離線轉移資料集。
 \paragraph{Version 5：Offline-Q Workflow Decision Policy}
 \text Version 5保留Version 3之所有測試生成能力，並以Offline-Q Policy取代Rule-based Policy作為學習型決策選擇器。系統首先利用既有Workflow Decision Events建立Offline RL Dataset，再透過Tabular Fitted Q Iteration訓練Workflow Decision Q-Policy。於執行期間，系統將WorkflowDecisionState轉換為State Feature Key，並查詢Q Table取得預期回報最高之恢復行動。Version 5之目的在於驗證工作流程決策是否可透過離線狀態--動作價值學習加以建模，並探索學習型策略在執行後恢復情境中的可行性與限制。
 
@@ -162,7 +163,7 @@ PassRate=
 \begin{equation}
 RecoveryRate=
 \frac{N_{Recovered}}
-{N_{InitialFailure}}
+{N_{StrictFail}}
 \times100\%
 \end{equation}
 
@@ -275,10 +276,12 @@ Action Space Size & 5 & 包含 \path{retry}、\path{resolve_resource}、\path{re
 
 
 \section{Manual Document Benchmark主實驗結果}
-本研究於相同TMDB Task Dataset、相同Manual Rule、相同人工文件結構化檔案\texttt{semantic\_restbench\_tmdb\_motified.csv}以及相同Live Execution環境下，分別執行Version 1至Version 5之測試流程，以評估不同技術元件對RESTful API自動化測試能力之影響。本研究以100筆由manual document與gold path定義之測試案例作為主要實驗基準。此實驗不同於完整OpenAPI端點層級測試，其分母並非所有可解析API端點，而是具備明確任務目標、必要輸入、預期結果與可接受失敗條件之manual-doc-grounded test cases。每一個測試案例皆依據manual rule判定最終結果，並分為strict pass、workflow recovered pass與fail三種類型。
-表\ref{tab:version_benchmark_results}顯示v1至v5於100筆測試案例上的主要結果。v1採用隨機測試方式，僅通過25筆，顯示未考慮規格與語意資訊時，測試請求容易產生無效參數與錯誤路徑。v2導入OpenAPI規格與seeded input後，通過率提升至72\%，表示規格感知與語意輸入建構能有效改善請求品質。v3加入manual parsing、seeded input與multi-agent materialization後，通過率為69\%。相較於v2，v3雖未進一步提升通過率，但其任務層級判定較嚴格，顯示更完整的測試實體化與manual rule檢查會重新過濾部分僅於HTTP層面成功之案例。
-\text v4加入rule-based workflow decision policy後，整體通過率仍維持69\%，顯示本輪主實驗中，規則式決策層尚未對最終任務完成率帶來額外增益。v5進一步導入offline-Q runtime decision selector後，通過率提升至79\%。值得注意的是，v5之Strict Pass Rate仍為0.69，與v3及v4相同；其Final Pass Rate提升至0.79，且新增之10筆通過皆來自Workflow Recovered Pass。此結果表示，v5的主要效益不在於提升前段測試生成能力，而在於於執行後根據工作流程狀態恢復原本會失敗之任務。
-\text 本輪主實驗中，Acceptable Failure Pass未觀察到通過案例，因此後續結果分析將以Strict Pass、Final Pass與Workflow Recovered Pass作為主要指標。值得注意的是，本章之v1至v5結果應理解為系統逐步加入規格感知輸入、多代理測試實體化、工作流程決策與恢復能力後的能力演進。特別是v4與v5之差異，除了決策選擇器形式不同外，亦涉及恢復行動能否於執行期被有效觸發，因此其結果解讀應以機制分析為主。
+\text 本研究於相同TMDB Task Dataset、相同Manual Rule、相同人工文件結構化檔案\texttt{semantic\_restbench\_tmdb\_motified.csv}以及相同Live Execution環境下，分別執行Version 1至Version 5之測試流程，以評估不同技術元件對RESTful API自動化測試能力之影響。本研究以100筆由manual document與gold path定義之測試案例作為主要實驗基準。此實驗不同於完整OpenAPI端點層級測試，其分母並非所有可解析API端點，而是具備明確任務目標、必要輸入、預期結果與可接受失敗條件之manual-doc-grounded test cases。每一個測試案例皆依據manual rule判定最終結果，並分為strict pass、workflow recovered pass與fail三種類型。
+\text 表\ref{tab:version_benchmark_results}顯示v1至v5於100筆測試案例上的主要結果。v1採用隨機測試方式，僅通過25筆，顯示未考慮規格與語意資訊時，測試請求容易產生無效參數與錯誤路徑。v2導入OpenAPI規格與seeded input後，通過率提升至72\%，表示規格感知與語意輸入建構能有效改善請求品質。v3加入manual parsing、seeded input與multi-agent materialization後，通過率為69\%。相較於v2，v3雖未進一步提升通過率，但其任務層級判定較嚴格，顯示更完整的測試實體化與manual rule檢查會重新過濾部分僅於HTTP層面成功之案例。
+\text 需特別說明的是，v2與v3之間的通過率差異，主因在於兩者評估通過的層次不同，而非多代理機制導致測試品質退步。v1與v2的通過判定以HTTP端點回應成功為主要依據：系統對100筆案例執行跨操作API呼叫，只要各步驟均取得成功的HTTP回應即視為通過，但此標準並未驗證操作間的業務邏輯與任務語意是否實際達成。因此，v2的0.72中可能包含「HTTP層面回應成功、但未正確完成操作間跨步驟資源綁定或未達成任務語意目標」的案例。v3同步導入Manual Rule與多代理測試實體化後，評估轉為任務層級語意合規性，要求測試結果符合人工文件所定義的操作間依賴關係與任務完成條件，過濾掉表面HTTP成功但任務語意不符的案例。因此，v3的0.69是本研究第一個能正確衡量「100筆任務的操作間業務邏輯是否實際達成」的通過率；v2的0.72與v3的0.69衡量的是不同層次的成功定義，兩者之間的差異應理解為評估精確度的校正結果而非系統能力的退步。
+\text v4加入rule-based workflow decision 分類模組後，整體通過率維持69\%，此結果符合v4之設計預期，v4之功能在於對工作流程決策行動進行分類標記與事件蒐集，本身不觸發恢復執行，因此任務層級通過率與v3相同為合理結果。v5進一步導入offline-Q runtime decision selector後，通過率提升至79\%。值得注意的是，v5之Strict Pass Rate仍為0.69，與v3及v4相同；其Final Pass Rate提升至0.79，且新增之10筆通過皆來自Workflow Recovered Pass。此結果表示，v5的主要效益不在於提升前段測試生成能力，而在於於執行後根據工作流程狀態恢復原本會失敗之任務。
+
+\text 本輪主實驗中，Acceptable Failure Pass未觀察到通過案例，因此後續結果分析將以Strict Pass、Final Pass與Workflow Recovered Pass作為主要指標。值得注意的是，本章之v1至v5結果應理解為系統逐步加入規格感知輸入、多代理測試實體化、工作流程決策與恢復能力後的能力演進。特別是v4與v5之差異，除了決策選擇器形式不同外，而v5涉及恢復行動能否於執行期被有效觸發，因此其結果解讀應以機制分析為主。
 
 \begin{table}[H]
 \centering
@@ -362,13 +365,14 @@ Stability=
 {N_{\mathrm{scheduled}}}
 \end{equation}
 \text 其中，$N_{\mathrm{completed}}$表示實際完成執行之任務數，$N_{\mathrm{scheduled}}$表示原定應執行之任務總數。於本輪主實驗中，$N_{\mathrm{completed}}=100$，$N_{\mathrm{scheduled}}=100$，故$Stability=1.0$；且\texttt{failed\_task\_runs=0}，表示至少在benchmark執行穩定性層面，本研究之實驗流程未因外部因素導致任務中止或批次失敗。
-\text 從效益角度觀察，v1至v2之提升主要反映規格導向輸入建構對請求品質的改善；v2至v3則顯示更嚴格之manual rule與materialization會重新校正任務層級通過率。v3至v4代表系統開始具備decision-aware baseline，但其Final Pass Rate仍未超出v3，顯示規則式決策層於本輪資料下尚未形成額外恢復增益。真正與本研究主題直接相關的效益發生於v5。雖然v5之Strict Pass Rate仍為0.69，與v3及v4相同，但其Final Pass Rate提升至0.79，表示decision layer並未改善前段生成品質，而是透過執行後之後續行動選擇改善workflow continuity。
+\text 從效益角度觀察，v1至v2之提升主要反映規格導向輸入建構對請求品質的改善；v2至v3則顯示Manual Rule的引入將評估層次從HTTP回應層提升至任務語意合規層，重新校正了任務層級通過率。v3至v4代表系統開始具備decision-aware baseline，但其Final Pass Rate仍未超出v3，顯示規則式決策層於本輪資料下尚未形成額外恢復增益。真正與本研究主題直接相關的效益發生於v5。雖然v5之Strict Pass Rate仍為0.69，與v3及v4相同，但其Final Pass Rate提升至0.79，表示decision layer並未改善前段生成品質，而是透過執行後之後續行動選擇改善workflow continuity。
 \text 其次，就Workflow Recovery而言，v5新增10筆Workflow Recovered Pass，而v1至v4均為0，顯示離線決策策略已在部分情境下提供實質恢復能力。再次，就Oracle Match與Final Pass而言，v5之最終任務判定高於其Strict Pass，表示部分案例雖未於初始執行即成功，但能透過後續恢復步驟轉為最終成功。最後，就Benchmark Stability而言，本輪100筆任務均完成執行，且無失敗批次，表示此比較結果具備基本完整性。
 
+\clearpage
 \subsection{Workflow Recovery Analysis}
 \text Version 5導入Offline-Q Workflow Decision Policy後，共有10筆案例於初始執行失敗後成功恢復，最終完成測試任務。表\ref{tab:workflow_recovery_cases}整理所有成功恢復案例。
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{Workflow Recovery Cases in Version 5}
 \label{tab:workflow_recovery_cases}
@@ -511,14 +515,18 @@ RecoveryRate(v5)=\frac{10}{31}\approx0.3226
 
 \text 分析結果顯示，所有成功恢復案例皆屬於資源識別碼失效所導致之404 Not Found錯誤。當Offline-Q Policy判斷當前狀態符合資源缺失特徵時，系統會選擇\texttt{resolve\_resource\_and\_rerun}作為恢復行動，並透過Resource Pool重新取得有效資源識別碼後再次執行測試。
 \text 此結果表示，本輪主實驗中最具辨識力之決策變數組合為HTTP Status、Error Type、Dependency Status與Resource Availability。換言之，v5目前最主要學到的是「404 + 資源依賴缺失」情境下之工作流程恢復模式，而非全面性涵蓋所有錯誤類型之恢復策略。
+\text 進一步觀察表~\ref{tab:workflow_recovery_cases}之資源識別碼分布可知，10筆恢復案例中，\path{person_id=81247}出現於tmdb\_006、tmdb\_044、tmdb\_085、tmdb\_086、tmdb\_091共5筆案例，\path{movie_id=1236482}出現於tmdb\_011、tmdb\_020、tmdb\_023、tmdb\_025共4筆案例，底層資源綁定失效根因實際集中於約2至3類不同的跨步驟資源缺失情境。此觀察顯示，RecoveryRate所反映的，是系統在特定資源識別碼缺失型態下具備穩定的持續執行能力——相同根因在多個任務案例中均能被成功恢復，本身即為恢復層穩定性的正面佐證——而非10種完全獨立的異質恢復情境均已得到驗證。因此，對當前恢復能力較準確的定位應為：系統已在「跨步驟資源識別碼缺失」此一特定情境下展現穩定的後執行恢復能力；對其他錯誤型態下的恢復廣度，仍需更多樣化的執行資料加以補充。
 
 \subsection{v4與v5之差異分析}
+\text v4與v5之比較設計，其核心定位在於對照兩種典型的工作流程決策情境。v4代表目前主流結合大型語言模型之API自動化測試工具的典型能力邊界：系統能夠解析規格、生成測試案例並執行測試，於遭遇失敗時對工作流程決策行動進行分類標記與事件記錄，但本身不觸發實際恢復行動。此模式對應於現行多數LLM輔助測試框架的實際運作方式——能夠理解規格語意，但在執行障礙後選擇停止，而非嘗試恢復。v5則為本研究Offline-Q策略學習之實驗設計，透過離線強化學習所訓練之Q-Policy，於執行失敗後根據工作流程狀態實際觸發對應恢復行動，驗證學習型工作流程決策策略在執行後恢復情境中的可行性。因此，v4與v5之比較，其本質問題為：結合大型語言模型的API自動化測試，能否透過後執行工作流程決策策略，突破失敗即停止的能力邊界。
+
 \text 因此，v4與v5之差異不宜簡化為rule-based與離線強化學習之純策略比較。較精確地說，v4主要代表decision-aware verdict baseline；v5則是在工作流程恢復機制存在時，進一步以學習型決策選擇器決定是否觸發資源解析、更新授權、重新產生資料或直接報告。故本研究目前最直接成立之結論，是工作流程恢復層與狀態導向決策可共同提升流程延續性，而非單獨宣稱Offline-Q已全面優於規則式策略。
-\text 雖然v4與v5於本研究主實驗中之研究定位皆屬工作流程決策層版本，但兩者所代表的研究意義不同。v4主要驗證rule-based workflow decision policy能否根據manual rule與錯誤分類，判斷非2XX結果是否仍屬於任務可接受結果。換言之，v4的功能重點在於workflow-level verdict，而非將失敗請求重新執行為成功結果。
+\text 雖然v4與v5於本研究主實驗中之研究定位皆屬工作流程決策層版本，但兩者所代表的研究意義不同。v4主要驗證rule-based workflow decision 能否根據manual rule與錯誤分類，判斷非2XX結果是否仍屬於任務可接受結果。換言之，v4的功能重點在於workflow-level verdict，而非將失敗請求重新執行為成功結果。
 \text 相較之下，v5導入offline-Q runtime decision selector，其目標是根據離線轉移資料集所學得之狀態--行動價值，於執行時選擇較合適的工作流程行動。就本輪主實驗結果而言，v4之Final Pass Rate為0.69，v5則提升至0.79；然而，v5之Strict Pass Rate仍為0.69，與v4相同。此結果表示，v5之額外提升並非來自前段測試生成品質改善，而是來自執行後工作流程恢復能力。
 \text 更具體地說，v4使系統可在語意層級上避免將環境限制或資源缺失直接視為任務失敗；v5則進一步在部分404資源缺失情境中，透過資源池、manual binding pool與runtime value pool執行second-pass rerun，使原先失敗之請求重新取得成功結果，並轉為workflow recovered pass。
 \text 綜合而言，本研究目前最直接成立之結論為：工作流程恢復層與狀態導向決策可共同提升流程延續性。此差異對RESTful API測試具有實務意義——在具操作間依賴之API任務中，系統從失敗狀態恢復並繼續執行後續步驟，其測試訊號價值高於單純將失敗結果標記為可接受。
 
+\clearpage
 \subsection{Offline-Q策略學習之深度診斷}
 \text 本節說明 Offline-Q 策略學習之訓練結果、Q-table結構診斷，以及策略學習之有效邊界與限制。完成Offline Dataset建構後，本研究採用Tabular Fitted Q Iteration進行離線策略訓練，折扣因子（Discount Factor）設定為$\gamma=0.9$，共進行25次迭代更新。訓練結果如表~\ref{tab:q_training_summary}所示，最終Q-table包含60個states與62組state-action pairs。
 
@@ -545,7 +553,15 @@ Final State-Action Pairs & 62 \\
 \end{tabular}
 \end{table}
 
-\text 進一步觀察資料分布可知，目前訓練資料具有明顯之action不平衡。訓練集之行動分布為：\path{report=113}、\path{resolve_resource=21}、\path{regenerate_data=3}、\path{refresh_token=1}與\path{retry=1}。訓練集大多來自「成功後進入報告」之記錄，低頻恢復型行動之覆蓋相對有限。
+\text 進一步觀察資料分布可知，目前訓練資料具有明顯之action不平衡。訓練集之行動分布如下：
+\begin{itemize}
+    \item \path{report=113}
+    \item \path{resolve_resource=21}
+    \item \path{regenerate_data=3}
+    \item \path{refresh_token=1}
+    \item \path{retry=1}
+\end{itemize}
+\text 訓練集大多來自「成功後進入報告」之記錄，低頻恢復型行動之覆蓋相對有限。
 
 \paragraph{Q-table 結構診斷}
 \text 對完整Q-table（圖\ref{fig:q_table}）進行結構性分析後，發現60個訓練狀態中，58個狀態僅含單一動作之Q值記錄，其餘行動欄位均為空值，代表這些狀態在訓練資料中從未觀察到其他行動被執行。在單一動作狀態下，$\max_{a'} Q(s', a')$退化為確定性常數，Fitted-Q迭代無法引入跨行動之相對價值比較。僅有2個狀態具備多動作對比記錄，可作為策略評估之對比狀態（contrastive states）。
@@ -559,9 +575,10 @@ Final State-Action Pairs & 62 \\
 Q^{(k)}(s,a)-Q^{(k-1)}(s,a)
 \right|
 \end{equation}
-\begin{figure}[H]
+\clearpage
+\begin{figure}[!htbp]
     \centering
-    \includegraphics[width = 1.0\textwidth]{static-page/offline_q_learning_table.png}
+    \includegraphics[width = 0.92\textwidth]{static-page/offline_q_learning_table.png}
     \caption{Offline-Q Policy之Q-table}
     \label{fig:q_table}
 \end{figure}
@@ -569,14 +586,14 @@ Q^{(k)}(s,a)-Q^{(k-1)}(s,a)
 \paragraph{Q-value 分布與行動偏好}
 \text 在Q-value整體分布方面，本輪62個state-action pairs之統計結果為：最小值$-0.05$、最大值$1.00$、平均值$0.8217$、中位數$0.9995$，其中正值61筆、負值1筆。Q-value高度集中於1.0附近，顯示多數狀態下策略已穩定偏好「完成當前流程並進入報告」之行動。
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width = 1.0\textwidth]{static-page/offline_q_value_histogram.png}
     \caption{Offline-Q Policy之Q-value分布}
     \label{fig:q_value_histogram}
 \end{figure}
 
-\begin{table}[H]
+\begin{table}[!htbp]
 \centering
 \caption{Offline-Q各決策行動Q-value統計}
 \label{tab:q_action_distribution}
@@ -601,7 +618,7 @@ report & 42 & 0.9400 & 1.00 & 42 & 0 \\
 \text 表\ref{tab:q_action_distribution}顯示，不同行動之Q-value分布具有明顯差異。\texttt{report}擁有最高平均值與最大值，反映策略已穩定學到「於成功或已可明確歸因之狀態下結束流程」的偏好。於真正恢復型行動中，\texttt{resolve\_resource}之平均Q-value最高，\texttt{regenerate\_data}次之，而\texttt{retry}為唯一負值，表示在目前資料下，對相同失敗狀態直接重送相同請求通常無法帶來正向回報。
 
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width = 0.98\textwidth]{static-page/offline_q_per_action_summary_table.png}
     \caption{Offline-Q各決策行動之完整Q-value統計摘要}
@@ -611,7 +628,7 @@ report & 42 & 0.9400 & 1.00 & 42 & 0 \\
 \text 若將圖\ref{fig:q_action_summary_table}與圖\ref{fig:q_value_boxplot}併同觀察，前者提供各行動之分位數摘要，後者則提供分布形狀與離散程度之視覺化證據。兩者共同顯示，目前Offline-Q所學得之主要有效模式，集中於「成功後報告」與「404資源依賴缺失下進行資源解析」兩類狀態。
 \text 為補充表\ref{tab:q_action_distribution}所呈現之平均值與正負值分布，圖\ref{fig:q_action_summary_table}進一步列出各決策行動之最小值、第一四分位數、中位數、第三四分位數、最大值與平均值。由圖可觀察到，\texttt{report}之第一四分位數已達0.9995，顯示多數成功後報告狀態之Q-value高度集中於1.0附近；\texttt{resolve\_resource}則集中於約0.60至0.65之區間，反映其為目前最穩定的恢復型行動；\texttt{retry}則仍為唯一負值行動，進一步支持其在現有資料覆蓋下並非有效策略。
 
-\begin{figure}[H]
+\begin{figure}[!htbp]
     \centering
     \includegraphics[width = 1.0\textwidth]{static-page/offline_q_value_lineplot_by_action.png}
     \caption{不同決策行動之Q-value分布}
